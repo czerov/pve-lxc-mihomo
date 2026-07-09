@@ -70,11 +70,38 @@ normalize_addr() {
 }
 
 auto_detect_proxy() {
-  local gw prefix host port candidate
+  local detected
+  if detected="$(auto_detect_online_proxy)"; then
+    printf '%s' "$detected"
+    return 0
+  fi
 
   if [ -n "${PROXY_ADDR:-}" ]; then
     printf '%s' "$(normalize_addr "$PROXY_ADDR")"
     return 0
+  fi
+
+  local gw
+  gw="$(detect_gateway || true)"
+  if [ -n "$gw" ]; then
+    printf '%s:%s' "$gw" "$DEFAULT_PORT"
+  else
+    printf '127.0.0.1:%s' "$DEFAULT_PORT"
+  fi
+}
+
+auto_detect_online_proxy() {
+  local gw prefix host port candidate
+
+  if [ -n "${PROXY_ADDR:-}" ]; then
+    candidate="$(normalize_addr "$PROXY_ADDR")"
+    host="${candidate%:*}"
+    port="${candidate##*:}"
+    if tcp_probe "$host" "$port"; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+    return 1
   fi
 
   gw="$(detect_gateway || true)"
@@ -101,11 +128,7 @@ auto_detect_proxy() {
     done
   fi
 
-  if [ -n "$gw" ]; then
-    printf '%s:%s' "$gw" "$DEFAULT_PORT"
-  else
-    printf '127.0.0.1:%s' "$DEFAULT_PORT"
-  fi
+  return 1
 }
 
 write_proxy() {
@@ -232,6 +255,7 @@ Usage:
   bash proxy.sh on [host:port]
   bash proxy.sh off
   bash proxy.sh status
+  bash proxy.sh detect
 
 Environment:
   PROXY_ADDR=192.168.1.100:7897
@@ -256,6 +280,9 @@ main() {
       ;;
     status)
       show_status
+      ;;
+    detect)
+      auto_detect_online_proxy
       ;;
     help|-h|--help)
       usage

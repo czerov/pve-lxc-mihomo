@@ -16,6 +16,7 @@
 - 覆盖前自动备份，不批量删除文件
 - 适配国内网络下载
 - 附带 Debian LXC 代理开关脚本，方便容器内临时配置 APT 代理
+- PVE 自动安装时可选集成 LXC 代理，APT 和核心下载都会走代理
 
 ## 1-4 阶段全自动
 
@@ -47,6 +48,24 @@ bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/p
 CTID=109 CT_IP_CIDR=192.168.1.9/24 CT_GW=192.168.1.1 CT_BRIDGE=vmbr0 bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
 ```
 
+如果容器内下载慢，可以让自动安装流程先配置 LXC 代理，再安装 Mihomo / NexusBox：
+
+```bash
+LXC_PROXY=auto bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
+```
+
+`auto` 只会在容器内探测到在线代理时启用。也可以强制指定代理：
+
+```bash
+LXC_PROXY=on LXC_PROXY_ADDR=192.168.1.100:7897 bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
+```
+
+关闭或清理容器内代理：
+
+```bash
+LXC_PROXY=disable USE_EXISTING=1 CTID=109 bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
+```
+
 自动完成：
 
 - 第 1 阶段：下载 Debian LXC 模板并创建 LXC
@@ -73,6 +92,8 @@ USE_EXISTING=1 CTID=109 bash <(curl -fsSL https://gh.llkk.cc/https://raw.githubu
 ## LXC 代理助手
 
 这个脚本来自 `czerov/pve-proxy` 的思路，已改成不写死局域网 IP。适合在 Debian LXC 容器里临时开启 / 关闭 APT 代理。
+
+自动安装脚本 `pve-install.sh` 已经可以通过 `LXC_PROXY=auto` 或 `LXC_PROXY=on` 调用它；下面这些命令适合单独在容器里使用。
 
 菜单模式：
 

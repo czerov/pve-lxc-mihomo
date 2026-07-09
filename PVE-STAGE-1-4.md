@@ -54,6 +54,34 @@ bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/p
 USE_EXISTING=1 CTID=109 bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
 ```
 
+如果 LXC 内下载 GitHub / apt 较慢，可以把代理助手融入自动流程：
+
+```bash
+LXC_PROXY=auto bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
+```
+
+`LXC_PROXY=auto` 会在容器内探测网关和常见端口，只有探测到在线代理才启用；没有探测到就继续直连安装。
+
+手动指定代理：
+
+```bash
+LXC_PROXY=on \
+LXC_PROXY_ADDR=192.168.1.100:7897 \
+bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
+```
+
+常用参数：
+
+```text
+LXC_PROXY=off       默认，不配置代理
+LXC_PROXY=auto      自动探测在线代理，探测不到则跳过
+LXC_PROXY=on        开启代理，可配合 LXC_PROXY_ADDR
+LXC_PROXY=disable   清理容器内代理配置
+LXC_PROXY_ADDR=IP:端口
+LXC_PROXY_PORT=7897
+LXC_PROXY_COMMON_PORTS="7897 7890 7891 7892 1080 20171"
+```
+
 已有容器模式会：
 
 - 读取 `/etc/pve/lxc/<CTID>.conf`。
@@ -112,8 +140,10 @@ lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
 脚本会：
 
 - 启动 LXC。
+- 如果设置了 `LXC_PROXY=auto/on/disable`，先在容器内配置或清理 APT / shell 代理。
 - 把 `install.sh` 推送到容器 `/root/mihomo-router-install.sh`。
 - 在容器内执行安装脚本。
+- 如果容器内代理已启用，安装脚本的 `curl` 下载也会继承 `http_proxy` / `https_proxy`。
 
 容器内脚本会：
 

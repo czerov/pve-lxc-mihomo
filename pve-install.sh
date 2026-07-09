@@ -11,6 +11,7 @@ REPO="${REPO:-czerov/pve-lxc-mihomo}"
 BRANCH="${BRANCH:-main}"
 RAW_BASE="${RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${BRANCH}}"
 INSTALL_URL="${INSTALL_URL:-${RAW_BASE}/install.sh}"
+PROXY_URL="${PROXY_URL:-${RAW_BASE}/proxy.sh}"
 GH_PROXY="${GH_PROXY:-}"
 
 CTID="${CTID:-109}"
@@ -31,6 +32,11 @@ CT_PASSWORD="${CT_PASSWORD:-}"
 CT_DNS="${CT_DNS:-223.5.5.5}"
 LXC_INSTALL_MODE="${LXC_INSTALL_MODE:-auto}"
 VERSION="${VERSION:-v1.19.28}"
+LXC_PROXY="${LXC_PROXY:-off}"
+LXC_PROXY_ADDR="${LXC_PROXY_ADDR:-}"
+LXC_PROXY_PORT="${LXC_PROXY_PORT:-7897}"
+LXC_PROXY_COMMON_PORTS="${LXC_PROXY_COMMON_PORTS:-7897 7890 7891 7892 1080 20171}"
+LXC_PROXY_HTTP=""
 
 WORK_DIR="${WORK_DIR:-/tmp/pve-mihomo-router}"
 LOG="${LOG:-/root/pve-mihomo-router-install.log}"
@@ -301,6 +307,65 @@ start_container() {
   die "Container did not become ready."
 }
 
+setup_lxc_proxy() {
+  case "$LXC_PROXY" in
+    off|"")
+      return 0
+      ;;
+    disable)
+      say "Disabling proxy inside LXC"
+      ;;
+    auto|on)
+      say "Configuring proxy inside LXC: LXC_PROXY=$LXC_PROXY"
+      ;;
+    *)
+      die "Unknown LXC_PROXY=$LXC_PROXY. Use off, auto, on, or disable."
+      ;;
+  esac
+
+  local local_proxy="$WORK_DIR/proxy.sh"
+  if [ -f "./proxy.sh" ]; then
+    cp ./proxy.sh "$local_proxy"
+  else
+    download_with_fallback "$PROXY_URL" "$local_proxy" || die "Failed to download proxy.sh"
+  fi
+  chmod +x "$local_proxy"
+  pct push "$CTID" "$local_proxy" /root/lxc-proxy.sh -perms 0755
+
+  if [ "$LXC_PROXY" = "disable" ]; then
+    pct exec "$CTID" -- bash /root/lxc-proxy.sh off || true
+    return 0
+  fi
+
+  local proxy_addr=""
+  if [ "$LXC_PROXY" = "auto" ]; then
+    proxy_addr="$(pct exec "$CTID" -- env \
+      PROXY_ADDR="$LXC_PROXY_ADDR" \
+      PROXY_PORT="$LXC_PROXY_PORT" \
+      COMMON_PORTS="$LXC_PROXY_COMMON_PORTS" \
+      bash /root/lxc-proxy.sh detect 2>/dev/null || true)"
+    if [ -z "$proxy_addr" ]; then
+      say "No online LXC proxy detected. Continue without proxy."
+      return 0
+    fi
+    say "Detected online LXC proxy: $proxy_addr"
+  else
+    proxy_addr="$LXC_PROXY_ADDR"
+  fi
+
+  pct exec "$CTID" -- env \
+    PROXY_ADDR="$LXC_PROXY_ADDR" \
+    PROXY_PORT="$LXC_PROXY_PORT" \
+    COMMON_PORTS="$LXC_PROXY_COMMON_PORTS" \
+    bash /root/lxc-proxy.sh on "$proxy_addr"
+
+  proxy_addr="$(pct exec "$CTID" -- sh -c "sed -n 's/.*http:\\/\\/\\([^\"]*\\).*/\\1/p' /etc/apt/apt.conf.d/99proxy 2>/dev/null | head -1" || true)"
+  if [ -n "$proxy_addr" ]; then
+    LXC_PROXY_HTTP="http://${proxy_addr}"
+    say "LXC installer will use proxy: $LXC_PROXY_HTTP"
+  fi
+}
+
 run_in_container() {
   say "Running installer inside LXC"
   local local_install="$WORK_DIR/install.sh"
@@ -311,7 +376,17 @@ run_in_container() {
   fi
   chmod +x "$local_install"
   pct push "$CTID" "$local_install" /root/mihomo-router-install.sh -perms 0755
-  pct exec "$CTID" -- env MODE="$LXC_INSTALL_MODE" VERSION="$VERSION" bash /root/mihomo-router-install.sh
+
+  local env_args=(MODE="$LXC_INSTALL_MODE" VERSION="$VERSION")
+  if [ -n "$LXC_PROXY_HTTP" ]; then
+    env_args+=(
+      http_proxy="$LXC_PROXY_HTTP"
+      https_proxy="$LXC_PROXY_HTTP"
+      HTTP_PROXY="$LXC_PROXY_HTTP"
+      HTTPS_PROXY="$LXC_PROXY_HTTP"
+    )
+  fi
+  pct exec "$CTID" -- env "${env_args[@]}" bash /root/mihomo-router-install.sh
 }
 
 print_summary() {
@@ -322,6 +397,7 @@ print_summary() {
   echo "NexusBox UI, if installed: http://${ip}:18080"
   echo "Mihomo mixed proxy: ${ip}:7890"
   echo "Mihomo controller: http://${ip}:9090"
+  [ -n "$LXC_PROXY_HTTP" ] && echo "LXC proxy used during install: $LXC_PROXY_HTTP"
   echo
   echo "Stage 5 still needs router settings:"
   echo "  route: 198.18.0.0/16 -> ${ip}"
@@ -343,6 +419,7 @@ main() {
   fi
   configure_lxc_tun
   start_container
+  setup_lxc_proxy
   run_in_container
   print_summary
 }
