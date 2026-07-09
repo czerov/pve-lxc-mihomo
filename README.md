@@ -24,6 +24,16 @@
 
 注意：`pve-install.sh` 不是在 LXC 容器里执行的。如果终端提示符像 `root@msn`、`root@debian`，并且报 `pct not found`，说明你进的是容器；请切到 PVE 宿主机 root shell，或者改用下面的“仅容器内安装 / 修复”命令。
 
+默认会弹出交互选择：
+
+- 纯 Mihomo 旁路由：无 NexusBox UI，无 `18080`
+- 自动模式：已有 NexusBox 就修复核心，否则装纯 Mihomo
+- 修复已有 NexusBox 核心
+- 通过 `NEXUSBOX_INSTALL_URL` 安装 NexusBox UI 后修复核心
+- LXC 代理：关闭、自动探测、手动输入
+
+如果不想交互，可以加 `INTERACTIVE=0` 并用环境变量指定。
+
 国外网络：
 
 ```bash
@@ -170,6 +180,12 @@ bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/
 
 ```bash
 MODE=auto bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install.sh)
+```
+
+安装 NexusBox UI 需要提供安装脚本地址：
+
+```bash
+MODE=nexusbox-install NEXUSBOX_INSTALL_URL=https://example.com/nexusbox-install.sh bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install.sh)
 ```
 
 只修复 NexusBox 核心：

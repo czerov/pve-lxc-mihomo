@@ -39,6 +39,8 @@ LXC_PROXY_PORT="${LXC_PROXY_PORT:-7897}"
 LXC_PROXY_COMMON_PORTS="${LXC_PROXY_COMMON_PORTS:-7897 7890 7891 7892 1080 20171}"
 LXC_PROXY_HTTP=""
 INSTALL_PROFILE="unknown"
+INTERACTIVE="${INTERACTIVE:-auto}"
+NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-}"
 
 WORK_DIR="${WORK_DIR:-/tmp/pve-mihomo-router}"
 LOG="${LOG:-/root/pve-mihomo-router-install.log}"
@@ -68,6 +70,63 @@ require_pve_host() {
   fi
   have pveam || die "pveam not found. Run this on a Proxmox VE host."
   have curl || die "curl not found. Install curl on the PVE host first."
+}
+
+is_interactive() {
+  [ "$INTERACTIVE" != "0" ] && [ "$INTERACTIVE" != "false" ] && [ -t 0 ]
+}
+
+prompt_choices() {
+  is_interactive || return 0
+
+  if [ "$LXC_INSTALL_MODE" = "auto" ] && [ -z "$NEXUSBOX_INSTALL_URL" ]; then
+    echo
+    echo "Install mode:"
+    echo "  1) Standalone Mihomo side-router (no NexusBox UI / no 18080)"
+    echo "  2) Auto: fix NexusBox if already installed, otherwise standalone Mihomo"
+    echo "  3) Fix existing NexusBox core only"
+    echo "  4) Install NexusBox UI from installer URL, then fix core"
+    printf "Choose [1-4, default 1]: "
+    read -r install_choice
+    case "${install_choice:-1}" in
+      1) LXC_INSTALL_MODE="standalone" ;;
+      2) LXC_INSTALL_MODE="auto" ;;
+      3) LXC_INSTALL_MODE="nexusbox" ;;
+      4)
+        LXC_INSTALL_MODE="nexusbox-install"
+        if [ -z "$NEXUSBOX_INSTALL_URL" ]; then
+          printf "NexusBox installer URL: "
+          read -r NEXUSBOX_INSTALL_URL
+        fi
+        [ -n "$NEXUSBOX_INSTALL_URL" ] || die "NEXUSBOX_INSTALL_URL is required for NexusBox UI installation."
+        ;;
+      *) die "Invalid install mode choice: $install_choice" ;;
+    esac
+  fi
+
+  if [ "$LXC_PROXY" = "off" ]; then
+    echo
+    echo "LXC proxy:"
+    echo "  1) Off"
+    echo "  2) Auto-detect online proxy"
+    echo "  3) Manually enter proxy address"
+    printf "Choose [1-3, default 1]: "
+    read -r proxy_choice
+    case "${proxy_choice:-1}" in
+      1) LXC_PROXY="off" ;;
+      2) LXC_PROXY="auto" ;;
+      3)
+        LXC_PROXY="on"
+        printf "Proxy address, for example 192.168.1.100:7897: "
+        read -r LXC_PROXY_ADDR
+        [ -n "$LXC_PROXY_ADDR" ] || die "LXC_PROXY_ADDR is required for manual proxy mode."
+        ;;
+      *) die "Invalid proxy choice: $proxy_choice" ;;
+    esac
+  fi
+
+  say "Selected install mode: $LXC_INSTALL_MODE"
+  say "Selected LXC proxy mode: $LXC_PROXY"
 }
 
 detect_storage() {
@@ -441,7 +500,7 @@ run_in_container() {
   chmod +x "$local_install"
   pct push "$CTID" "$local_install" /root/mihomo-router-install.sh -perms 0755
 
-  local env_args=(MODE="$LXC_INSTALL_MODE" VERSION="$VERSION")
+  local env_args=(MODE="$LXC_INSTALL_MODE" VERSION="$VERSION" NEXUSBOX_INSTALL_URL="$NEXUSBOX_INSTALL_URL")
   if [ -n "$LXC_PROXY_HTTP" ]; then
     env_args+=(
       http_proxy="$LXC_PROXY_HTTP"
@@ -551,6 +610,7 @@ print_summary() {
 
 main() {
   require_pve_host
+  prompt_choices
   detect_storage
   if [ "$USE_EXISTING" = "1" ]; then
     confirm_existing_ctid

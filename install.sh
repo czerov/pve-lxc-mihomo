@@ -17,6 +17,7 @@ MIHOMO_BIN="${MIHOMO_BIN:-/usr/local/bin/mihomo}"
 NEXUSBOX_BIN="${NEXUSBOX_BIN:-/opt/nexusbox/nexusbox}"
 NEXUSBOX_CORE="${NEXUSBOX_CORE:-/opt/mihomo/mihomo}"
 NEXUSBOX_CONFIG_DIR="${NEXUSBOX_CONFIG_DIR:-/opt/config}"
+NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-}"
 MODE="${MODE:-auto}"
 INSTALL_PROFILE="${INSTALL_PROFILE:-unknown}"
 
@@ -309,6 +310,25 @@ fix_nexusbox_core() {
   verify_nexusbox_running
 }
 
+install_nexusbox_from_url() {
+  say "Mode: install NexusBox UI, then fix Mihomo core"
+  [ -n "$NEXUSBOX_INSTALL_URL" ] || die "NEXUSBOX_INSTALL_URL is required for MODE=nexusbox-install."
+  apt_install_if_missing ca-certificates curl gzip iproute2 iptables procps
+
+  local nexusbox_installer="$WORK_DIR/nexusbox-install.sh"
+  say "Downloading NexusBox installer: $NEXUSBOX_INSTALL_URL"
+  if have curl; then
+    curl -fL --connect-timeout 20 --retry 2 -o "$nexusbox_installer" "$NEXUSBOX_INSTALL_URL"
+  else
+    wget -T 20 -t 2 -O "$nexusbox_installer" "$NEXUSBOX_INSTALL_URL"
+  fi
+  chmod 0755 "$nexusbox_installer"
+  bash "$nexusbox_installer"
+
+  [ -x "$NEXUSBOX_BIN" ] || die "NexusBox installer finished, but $NEXUSBOX_BIN was not found."
+  fix_nexusbox_core
+}
+
 print_report() {
   say "Final report"
   echo "CPU arch: $(uname -m)"
@@ -350,11 +370,14 @@ main() {
     nexusbox)
       fix_nexusbox_core
       ;;
+    nexusbox-install)
+      install_nexusbox_from_url
+      ;;
     standalone)
       install_standalone_mihomo
       ;;
     *)
-      die "Unknown MODE=$MODE. Use auto, nexusbox, or standalone."
+      die "Unknown MODE=$MODE. Use auto, nexusbox, nexusbox-install, or standalone."
       ;;
   esac
 

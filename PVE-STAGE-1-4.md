@@ -6,6 +6,12 @@
 
 `pve-install.sh` 必须在 PVE 宿主机执行，不是在 LXC 容器里执行。
 
+默认会交互询问安装模式和 LXC 代理模式。如果要完全无人值守，设置：
+
+```bash
+INTERACTIVE=0 LXC_INSTALL_MODE=standalone LXC_PROXY=auto bash <(curl -fsSL ...)
+```
+
 ## 一键命令
 
 国外网络：
@@ -163,6 +169,7 @@ lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
 - 如果检测到 `/opt/nexusbox/nexusbox`，则修复 NexusBox 的 `/opt/mihomo/mihomo`。
 - 如果没有 NexusBox，则安装纯 Mihomo systemd 服务。
 - 纯 Mihomo 模式不会安装 NexusBox UI，因此不会开放 `18080`。
+- 如果要从零安装 NexusBox UI，使用 `LXC_INSTALL_MODE=nexusbox-install` 并提供 `NEXUSBOX_INSTALL_URL`。
 - 脚本会验证进程、服务、端口、`ip_forward` 和 NAT 规则；验证失败会直接报错，不打印成功。
 
 ## 第 4 阶段：LXC 内防火墙 / NAT 自启
