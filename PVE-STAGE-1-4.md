@@ -33,7 +33,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/p
 - PVE 当前桥接网卡，例如 `vmbr0`
 - PVE 当前内网 IP，例如 `192.168.1.100/24`
 - 默认网关，例如 `192.168.1.1`
-- 同网段可用 LXC IP，优先尝试 `.9`，被占用则尝试 `.6`、`.8`、`.10` 等
+- 同网段可用 LXC IP，优先尝试 `.9`、`.6`、`.8`、`.10` 等常用地址；都不可用时继续扫描当前网段
 
 也可以手动指定：
 

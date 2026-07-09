@@ -111,7 +111,10 @@ int_to_ip() {
 ip_in_use() {
   local ip="$1"
   ping -c 1 -W 1 "$ip" >/dev/null 2>&1 && return 0
-  ip neigh show "$ip" 2>/dev/null | grep -q .
+  ip neigh show "$ip" 2>/dev/null | awk '
+    /lladdr/ && $0 !~ /(FAILED|INCOMPLETE)/ { found = 1 }
+    END { exit found ? 0 : 1 }
+  '
 }
 
 detect_network() {
@@ -169,12 +172,34 @@ detect_network() {
         break
       fi
     done
+
+    if [ -z "$CT_IP_CIDR" ]; then
+      say "Common IP candidates are unavailable; scanning the local subnet"
+      local start_int end_int cur_int scan_end_int
+      start_int="$((net_int + 2))"
+      end_int="$((bcast_int - 1))"
+      scan_end_int="$end_int"
+      if [ "$((scan_end_int - start_int))" -gt 512 ]; then
+        scan_end_int="$((start_int + 512))"
+      fi
+      cur_int="$start_int"
+      while [ "$cur_int" -le "$scan_end_int" ]; do
+        candidate="$(int_to_ip "$cur_int")"
+        cur_int="$((cur_int + 1))"
+        [ "$candidate" != "$pve_ip" ] || continue
+        [ "$candidate" != "$CT_GW" ] || continue
+        if ! ip_in_use "$candidate"; then
+          CT_IP_CIDR="${candidate}/${prefix}"
+          break
+        fi
+      done
+    fi
   fi
 
-  [ -n "$CT_IP_CIDR" ] || die "Cannot choose an unused LXC IP. Set CT_IP_CIDR manually."
   say "Detected bridge: $CT_BRIDGE"
   say "Detected PVE IP: $pve_cidr"
   say "Detected gateway: $CT_GW"
+  [ -n "$CT_IP_CIDR" ] || die "Cannot choose an unused LXC IP. Set CT_IP_CIDR manually, for example: CT_IP_CIDR=<free-ip>/${prefix} CT_GW=${CT_GW} CT_BRIDGE=${CT_BRIDGE} bash pve-install.sh"
   say "Selected LXC IP: $CT_IP_CIDR"
 }
 
