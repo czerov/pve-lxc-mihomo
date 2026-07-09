@@ -26,7 +26,7 @@ CT_CORES="${CT_CORES:-1}"
 CT_MEMORY="${CT_MEMORY:-512}"
 CT_SWAP="${CT_SWAP:-0}"
 CT_DISK_SIZE="${CT_DISK_SIZE:-8}"
-CT_ROOTFS_STORAGE="${CT_ROOTFS_STORAGE:-local-lvm}"
+CT_ROOTFS_STORAGE="${CT_ROOTFS_STORAGE:-}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
 TEMPLATE_URL="${TEMPLATE_URL:-}"
 CT_PASSWORD="${CT_PASSWORD:-}"
@@ -67,6 +67,21 @@ require_pve_host() {
   fi
   have pveam || die "pveam not found. Run this on a Proxmox VE host."
   have curl || die "curl not found. Install curl on the PVE host first."
+}
+
+detect_storage() {
+  if [ -z "$CT_ROOTFS_STORAGE" ]; then
+    if pvesm status 2>/dev/null | awk 'NR > 1 {print $1}' | grep -Fxq 'local-lvm'; then
+      CT_ROOTFS_STORAGE="local-lvm"
+    elif pvesm status 2>/dev/null | awk 'NR > 1 {print $1}' | grep -Fxq 'local'; then
+      CT_ROOTFS_STORAGE="local"
+    else
+      die "Cannot detect rootfs storage. Set CT_ROOTFS_STORAGE manually."
+    fi
+  elif ! pvesm status 2>/dev/null | awk 'NR > 1 {print $1}' | grep -Fxq "$CT_ROOTFS_STORAGE"; then
+    die "Storage '$CT_ROOTFS_STORAGE' does not exist. Check pvesm status or set CT_ROOTFS_STORAGE."
+  fi
+  say "Using rootfs storage: $CT_ROOTFS_STORAGE"
 }
 
 confirm_new_ctid() {
@@ -338,11 +353,7 @@ configure_lxc_tun() {
   say "Configuring LXC TUN and nesting"
   [ -e "$conf" ] || die "LXC config not found: $conf"
   backup_file "$conf"
-  if [ "$USE_EXISTING" = "1" ]; then
-    pct set "$CTID" --features nesting=1,keyctl=1
-  else
-    pct set "$CTID" --features nesting=1,keyctl=1 --unprivileged 0
-  fi
+  pct set "$CTID" --features nesting=1,keyctl=1
   ensure_lxc_conf_line "$conf" "lxc.cgroup2.devices.allow: c 10:200 rwm"
   ensure_lxc_conf_line "$conf" "lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file"
 }
@@ -460,6 +471,7 @@ print_summary() {
 
 main() {
   require_pve_host
+  detect_storage
   if [ "$USE_EXISTING" = "1" ]; then
     confirm_existing_ctid
     detect_existing_container_network
