@@ -15,6 +15,7 @@
 - 自动选择同网段可用 LXC IP
 - 覆盖前自动备份，不批量删除文件
 - 适配国内网络下载
+- 附带 Debian LXC 代理开关脚本，方便容器内临时配置 APT 代理
 
 ## 1-4 阶段全自动
 
@@ -68,6 +69,34 @@ USE_EXISTING=1 CTID=109 bash <(curl -fsSL https://gh.llkk.cc/https://raw.githubu
 ```
 
 脚本会自动读取 `/etc/pve/lxc/109.conf` 里的 `net0`，识别 LXC IP、网桥、网关。如果容器是 DHCP，会启动容器后从容器内部自动读取当前 IP。
+
+## LXC 代理助手
+
+这个脚本来自 `czerov/pve-proxy` 的思路，已改成不写死局域网 IP。适合在 Debian LXC 容器里临时开启 / 关闭 APT 代理。
+
+菜单模式：
+
+```bash
+source <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/proxy.sh)
+```
+
+自动探测并开启：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/proxy.sh) on
+```
+
+手动指定代理：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/proxy.sh) on 192.168.1.100:7897
+```
+
+关闭代理：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/proxy.sh) off
+```
 
 ## 仅容器内安装 / 修复
 
