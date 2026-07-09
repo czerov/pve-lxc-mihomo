@@ -18,6 +18,7 @@ NEXUSBOX_BIN="${NEXUSBOX_BIN:-/opt/nexusbox/nexusbox}"
 NEXUSBOX_CORE="${NEXUSBOX_CORE:-/opt/mihomo/mihomo}"
 NEXUSBOX_CONFIG_DIR="${NEXUSBOX_CONFIG_DIR:-/opt/config}"
 MODE="${MODE:-auto}"
+INSTALL_PROFILE="${INSTALL_PROFILE:-unknown}"
 
 mkdir -p "$WORK_DIR"
 exec > >(tee -a "$LOG") 2>&1
@@ -163,8 +164,48 @@ EOF
   /etc/rc.local
 }
 
+port_listening() {
+  local port="$1"
+  ss -lntup 2>/dev/null | grep -Eq "[:.]${port}[[:space:]]"
+}
+
+wait_for_port() {
+  local port="$1" name="$2"
+  for _ in $(seq 1 20); do
+    if port_listening "$port"; then
+      say "Verified listening port: $name ($port)"
+      return 0
+    fi
+    sleep 1
+  done
+  die "$name is not listening on port $port."
+}
+
+verify_standalone_running() {
+  say "Verifying standalone Mihomo runtime"
+  if have systemctl; then
+    systemctl is-active --quiet mihomo || {
+      systemctl status mihomo --no-pager || true
+      die "mihomo.service is not active."
+    }
+  fi
+  pgrep -f "${MIHOMO_BIN} -d ${CONFIG_DIR}" >/dev/null || die "Mihomo process was not found."
+  wait_for_port 7890 "Mihomo mixed proxy"
+  wait_for_port 9090 "Mihomo controller API"
+  wait_for_port 1053 "Mihomo DNS"
+}
+
+verify_nexusbox_running() {
+  say "Verifying NexusBox runtime"
+  pgrep -f "$NEXUSBOX_BIN" >/dev/null || die "NexusBox process was not found."
+  wait_for_port 18080 "NexusBox UI"
+  wait_for_port 7890 "Mihomo mixed proxy"
+  wait_for_port 9090 "Mihomo controller API"
+}
+
 install_standalone_mihomo() {
   say "Mode: standalone Mihomo side-router"
+  INSTALL_PROFILE="standalone"
   apt_install_if_missing ca-certificates gzip iproute2 iptables procps
   prepare_core_binary
 
@@ -232,6 +273,7 @@ EOF
   systemctl daemon-reload
   systemctl enable --now mihomo
   write_rc_local_nat "$(detect_egress_iface)"
+  verify_standalone_running
 }
 
 restart_nexusbox() {
@@ -247,6 +289,7 @@ restart_nexusbox() {
 
 fix_nexusbox_core() {
   say "Mode: NexusBox core auto-fix"
+  INSTALL_PROFILE="nexusbox"
   [ -x "$NEXUSBOX_BIN" ] || die "NexusBox binary not found: $NEXUSBOX_BIN"
   apt_install_if_missing ca-certificates gzip iproute2 iptables procps
   prepare_core_binary
@@ -263,12 +306,14 @@ fix_nexusbox_core() {
   restart_nexusbox
 
   curl -fsS "http://127.0.0.1:18080/configs?force=true" || true
+  verify_nexusbox_running
 }
 
 print_report() {
   say "Final report"
   echo "CPU arch: $(uname -m)"
   echo "Core kind: ${CORE_KIND:-unknown}"
+  echo "Install profile: ${INSTALL_PROFILE:-unknown}"
   echo "Egress iface: $(detect_egress_iface)"
   echo "ip_forward: $(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || true)"
   echo

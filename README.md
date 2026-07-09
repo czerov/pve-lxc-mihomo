@@ -69,6 +69,8 @@ bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-ins
 CT_ROOTFS_STORAGE=local bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-install-cn.sh)
 ```
 
+安装结束前脚本会复查运行状态：进程、systemd 服务、监听端口、`ip_forward` 和 NAT 规则都通过后才打印成功。新建 LXC 默认是纯 Mihomo 模式，不安装 NexusBox，所以没有 `18080` 页面；`18080` 只在已有 NexusBox 时才会出现。
+
 如果容器内下载慢，可以让自动安装流程先配置 LXC 代理，再安装 Mihomo / NexusBox：
 
 ```bash
@@ -164,7 +166,7 @@ bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/
 
 ## 指定模式
 
-自动判断 NexusBox / 纯 Mihomo：
+自动判断 NexusBox / 纯 Mihomo。纯 Mihomo 模式没有 `18080` Web 页面，只提供代理、DNS 和控制 API：
 
 ```bash
 MODE=auto bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install.sh)

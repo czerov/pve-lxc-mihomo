@@ -38,6 +38,7 @@ LXC_PROXY_ADDR="${LXC_PROXY_ADDR:-}"
 LXC_PROXY_PORT="${LXC_PROXY_PORT:-7897}"
 LXC_PROXY_COMMON_PORTS="${LXC_PROXY_COMMON_PORTS:-7897 7890 7891 7892 1080 20171}"
 LXC_PROXY_HTTP=""
+INSTALL_PROFILE="unknown"
 
 WORK_DIR="${WORK_DIR:-/tmp/pve-mihomo-router}"
 LOG="${LOG:-/root/pve-mihomo-router-install.log}"
@@ -452,14 +453,93 @@ run_in_container() {
   pct exec "$CTID" -- env "${env_args[@]}" bash /root/mihomo-router-install.sh
 }
 
+verify_container_health() {
+  say "Verifying LXC runtime health"
+  local result
+  result="$(pct exec "$CTID" -- sh -s <<'EOS'
+set -eu
+fail=0
+profile=standalone
+if [ -x /opt/nexusbox/nexusbox ]; then
+  profile=nexusbox
+fi
+echo "profile=${profile}"
+
+check_cmd() {
+  label="$1"
+  shift
+  if "$@"; then
+    echo "ok: ${label}"
+  else
+    echo "fail: ${label}"
+    fail=1
+  fi
+}
+
+check_port() {
+  port="$1"
+  label="$2"
+  if ss -lntup 2>/dev/null | grep -Eq "[:.]${port}[[:space:]]"; then
+    echo "ok: ${label} port ${port}"
+  else
+    echo "fail: ${label} port ${port}"
+    fail=1
+  fi
+}
+
+if [ "$profile" = "nexusbox" ]; then
+  check_cmd "NexusBox process" pgrep -f /opt/nexusbox/nexusbox
+  check_port 18080 "NexusBox UI"
+else
+  check_cmd "mihomo.service active" systemctl is-active --quiet mihomo
+  check_cmd "Mihomo process" pgrep -f "/usr/local/bin/mihomo -d /etc/mihomo"
+fi
+
+check_port 7890 "Mihomo mixed proxy"
+check_port 9090 "Mihomo controller API"
+if [ "$profile" = "standalone" ]; then
+  check_port 1053 "Mihomo DNS"
+fi
+
+if [ "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo 0)" = "1" ]; then
+  echo "ok: ip_forward enabled"
+else
+  echo "fail: ip_forward disabled"
+  fail=1
+fi
+
+if iptables -t nat -S POSTROUTING 2>/dev/null | grep -q -- '-j MASQUERADE'; then
+  echo "ok: NAT MASQUERADE rule"
+else
+  echo "fail: NAT MASQUERADE rule"
+  fail=1
+fi
+
+exit "$fail"
+EOS
+)" || {
+    printf '%s\n' "$result"
+    die "LXC runtime verification failed."
+  }
+  printf '%s\n' "$result"
+  INSTALL_PROFILE="$(printf '%s\n' "$result" | sed -n 's/^profile=//p' | head -1)"
+  [ -n "$INSTALL_PROFILE" ] || INSTALL_PROFILE="unknown"
+}
+
 print_summary() {
   local ip="${CT_IP_CIDR%/*}"
   say "Stage 1-4 completed"
   echo "LXC ID: $CTID"
   echo "LXC IP: $ip"
-  echo "NexusBox UI, if installed: http://${ip}:18080"
+  echo "Install profile: $INSTALL_PROFILE"
+  if [ "$INSTALL_PROFILE" = "nexusbox" ]; then
+    echo "NexusBox UI: http://${ip}:18080"
+  else
+    echo "NexusBox UI: not installed (standalone Mihomo mode)"
+  fi
   echo "Mihomo mixed proxy: ${ip}:7890"
-  echo "Mihomo controller: http://${ip}:9090"
+  echo "Mihomo controller API: http://${ip}:9090"
+  [ "$INSTALL_PROFILE" = "standalone" ] && echo "Mihomo DNS: ${ip}:1053"
   [ -n "$LXC_PROXY_HTTP" ] && echo "LXC proxy used during install: $LXC_PROXY_HTTP"
   echo
   echo "Stage 5 still needs router settings:"
@@ -485,6 +565,7 @@ main() {
   start_container
   setup_lxc_proxy
   run_in_container
+  verify_container_health
   print_summary
 }
 

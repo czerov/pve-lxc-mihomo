@@ -162,6 +162,8 @@ lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
 - 不支持则安装 `mihomo-linux-amd64-compatible`。
 - 如果检测到 `/opt/nexusbox/nexusbox`，则修复 NexusBox 的 `/opt/mihomo/mihomo`。
 - 如果没有 NexusBox，则安装纯 Mihomo systemd 服务。
+- 纯 Mihomo 模式不会安装 NexusBox UI，因此不会开放 `18080`。
+- 脚本会验证进程、服务、端口、`ip_forward` 和 NAT 规则；验证失败会直接报错，不打印成功。
 
 ## 第 4 阶段：LXC 内防火墙 / NAT 自启
 
