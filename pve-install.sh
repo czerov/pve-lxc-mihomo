@@ -58,7 +58,12 @@ backup_file() {
 
 require_pve_host() {
   [ "$(id -u)" = "0" ] || die "Run as root on the PVE host."
-  have pct || die "pct not found. Run this on a Proxmox VE host."
+  if ! have pct; then
+    if systemd-detect-virt --container >/dev/null 2>&1 || [ -f /run/.containerenv ]; then
+      die "pct not found because this looks like an LXC/container. Run pve-install.sh on the PVE host. Inside an existing LXC, use install.sh instead."
+    fi
+    die "pct not found. Run this on a Proxmox VE host."
+  fi
   have pveam || die "pveam not found. Run this on a Proxmox VE host."
   have curl || die "curl not found. Install curl on the PVE host first."
 }

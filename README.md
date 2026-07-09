@@ -22,6 +22,8 @@
 
 在 PVE 宿主机执行。
 
+注意：`pve-install.sh` 不是在 LXC 容器里执行的。如果终端提示符像 `root@msn`、`root@debian`，并且报 `pct not found`，说明你进的是容器；请切到 PVE 宿主机 root shell，或者改用下面的“仅容器内安装 / 修复”命令。
+
 国外网络：
 
 ```bash
