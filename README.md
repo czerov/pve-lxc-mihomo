@@ -36,6 +36,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/p
 bash <(curl -fsSL https://gh.llkk.cc/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
 ```
 
+如果 `raw.githubusercontent.com` 或 GitHub 代理不可用，使用 jsDelivr CDN：
+
+```bash
+bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-install-cn.sh)
+```
+
 常用参数示例：
 
 默认会自动检测 PVE 当前内网，不需要写死 IP：
@@ -48,6 +54,13 @@ bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/p
 
 ```bash
 CTID=109 CT_IP_CIDR=192.168.1.9/24 CT_GW=192.168.1.1 CT_BRIDGE=vmbr0 bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
+```
+
+如果 PVE 官方模板下载慢，可以指定模板 URL：
+
+```bash
+TEMPLATE_URL=https://mirrors.tuna.tsinghua.edu.cn/proxmox/images/system/debian-12-standard_12.12-1_amd64.tar.zst \
+bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-install-cn.sh)
 ```
 
 如果容器内下载慢，可以让自动安装流程先配置 LXC 代理，再安装 Mihomo / NexusBox：

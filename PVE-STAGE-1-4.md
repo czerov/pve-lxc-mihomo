@@ -20,6 +20,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/p
 bash <(curl -fsSL https://gh.llkk.cc/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
 ```
 
+CDN 入口：
+
+```bash
+bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-install-cn.sh)
+```
+
 常用自定义参数：
 
 默认会自动检测 PVE 当前内网：
@@ -119,7 +125,10 @@ CT_CORES=1
 CT_MEMORY=512
 CT_SWAP=0
 CT_DISK_SIZE=8
+TEMPLATE_URL=空，默认使用 pveam 下载 Debian 12 模板
 ```
+
+如果 `download.proxmox.com` 很慢，可以设置 `TEMPLATE_URL` 指定模板下载地址。
 
 ## 第 2 阶段：配置 LXC 权限 / TUN
 

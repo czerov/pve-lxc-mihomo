@@ -28,6 +28,7 @@ CT_SWAP="${CT_SWAP:-0}"
 CT_DISK_SIZE="${CT_DISK_SIZE:-8}"
 CT_ROOTFS_STORAGE="${CT_ROOTFS_STORAGE:-local-lvm}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
+TEMPLATE_URL="${TEMPLATE_URL:-}"
 CT_PASSWORD="${CT_PASSWORD:-}"
 CT_DNS="${CT_DNS:-223.5.5.5}"
 LXC_INSTALL_MODE="${LXC_INSTALL_MODE:-auto}"
@@ -270,6 +271,27 @@ download_with_fallback() {
 
 choose_template() {
   local existing latest
+  if [ -n "$TEMPLATE_URL" ]; then
+    local filename template_path
+    filename="${TEMPLATE_URL%%\?*}"
+    filename="${filename##*/}"
+    [ -n "$filename" ] || die "Cannot parse template filename from TEMPLATE_URL."
+    template_path="$(pvesm path "${CT_TEMPLATE_STORAGE}:vztmpl/${filename}" 2>/dev/null || true)"
+    if [ -z "$template_path" ]; then
+      template_path="/var/lib/vz/template/cache/${filename}"
+    fi
+    mkdir -p "$(dirname "$template_path")"
+    if [ ! -s "$template_path" ]; then
+      say "Downloading LXC template from TEMPLATE_URL: $TEMPLATE_URL"
+      download_with_fallback "$TEMPLATE_URL" "$template_path" || die "Failed to download TEMPLATE_URL."
+    else
+      say "Use existing template file: $template_path"
+    fi
+    TEMPLATE="${CT_TEMPLATE_STORAGE}:vztmpl/${filename}"
+    say "Use custom template: $TEMPLATE"
+    return 0
+  fi
+
   existing="$(pveam list "$CT_TEMPLATE_STORAGE" 2>/dev/null | awk '/debian-12-standard.*amd64.*(tar.zst|tar.gz)/{print $1}' | sort -V | tail -1 || true)"
   if [ -n "$existing" ]; then
     TEMPLATE="$existing"
