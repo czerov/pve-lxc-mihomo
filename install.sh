@@ -1,0 +1,320 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# Mihomo / NexusBox one-key installer for PVE LXC side-router.
+# Safe defaults:
+# - No batch deletion.
+# - Existing files are copied to timestamped backups before overwrite.
+# - CPU is detected automatically: amd64-v3 core when supported, compatible core otherwise.
+
+VERSION="${VERSION:-v1.19.28}"
+BASE_URL="${BASE_URL:-https://github.com/MetaCubeX/mihomo/releases/download/${VERSION}}"
+WORK_DIR="${WORK_DIR:-/tmp/mihomo-router-install}"
+LOG="${LOG:-/root/mihomo-router-install.log}"
+CONFIG_DIR="${CONFIG_DIR:-/etc/mihomo}"
+CONFIG_FILE="${CONFIG_FILE:-${CONFIG_DIR}/config.yaml}"
+MIHOMO_BIN="${MIHOMO_BIN:-/usr/local/bin/mihomo}"
+NEXUSBOX_BIN="${NEXUSBOX_BIN:-/opt/nexusbox/nexusbox}"
+NEXUSBOX_CORE="${NEXUSBOX_CORE:-/opt/mihomo/mihomo}"
+NEXUSBOX_CONFIG_DIR="${NEXUSBOX_CONFIG_DIR:-/opt/config}"
+MODE="${MODE:-auto}"
+
+mkdir -p "$WORK_DIR"
+exec > >(tee -a "$LOG") 2>&1
+
+say() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
+die() { say "ERROR: $*"; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+backup_file() {
+  local path="$1"
+  local ts
+  ts="$(date +%Y%m%d-%H%M%S)"
+  if [ -e "$path" ]; then
+    cp -a "$path" "${path}.bak-${ts}"
+    say "Backed up $path -> ${path}.bak-${ts}"
+  fi
+}
+
+require_root() {
+  [ "$(id -u)" = "0" ] || die "Please run as root."
+}
+
+detect_egress_iface() {
+  local iface
+  iface="$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -1 || true)"
+  [ -n "$iface" ] || iface="eth0"
+  printf '%s' "$iface"
+}
+
+cpu_supports_amd64_v3() {
+  [ "$(uname -m)" = "x86_64" ] || return 1
+  local flags missing=0
+  flags="$(awk -F: '/flags/{print " " $2 " "; exit}' /proc/cpuinfo 2>/dev/null || true)"
+  for f in avx avx2 bmi1 bmi2 f16c fma lzcnt movbe osxsave; do
+    case "$flags" in
+      *" $f "*) ;;
+      *) missing=1 ;;
+    esac
+  done
+  [ "$missing" = "0" ]
+}
+
+choose_asset() {
+  local arch
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64)
+      if cpu_supports_amd64_v3; then
+        CORE_KIND="amd64-v3"
+        ASSET="mihomo-linux-amd64-v3-${VERSION}.gz"
+      else
+        CORE_KIND="amd64-compatible"
+        ASSET="mihomo-linux-amd64-compatible-${VERSION}.gz"
+      fi
+      ;;
+    aarch64|arm64)
+      CORE_KIND="arm64"
+      ASSET="mihomo-linux-arm64-${VERSION}.gz"
+      ;;
+    *)
+      die "Unsupported CPU arch: $arch"
+      ;;
+  esac
+  say "Selected core: $CORE_KIND ($ASSET)"
+}
+
+download_file() {
+  local asset="$1"
+  local output="$2"
+  local raw_url="${BASE_URL}/${asset}"
+  local urls=()
+
+  if [ -n "${GH_PROXY:-}" ]; then
+    urls+=("${GH_PROXY%/}/${raw_url}")
+  fi
+
+  urls+=(
+    "$raw_url"
+    "https://gh.llkk.cc/${raw_url}"
+    "https://gh-proxy.com/${raw_url}"
+    "https://mirror.ghproxy.com/${raw_url}"
+  )
+
+  say "Downloading $asset"
+  for url in "${urls[@]}"; do
+    say "Try: $url"
+    if have curl; then
+      if curl -fL --connect-timeout 15 --retry 2 -o "$output" "$url"; then
+        return 0
+      fi
+    elif have wget; then
+      if wget -T 15 -t 2 -O "$output" "$url"; then
+        return 0
+      fi
+    else
+      die "curl/wget is missing. Install curl first."
+    fi
+  done
+  die "Download failed. You can retry with: GH_PROXY=https://your-github-proxy/ bash $0"
+}
+
+apt_install_if_missing() {
+  local pkgs=()
+  for p in "$@"; do
+    if ! dpkg -s "$p" >/dev/null 2>&1; then
+      pkgs+=("$p")
+    fi
+  done
+  [ "${#pkgs[@]}" -gt 0 ] || return 0
+
+  say "Installing packages: ${pkgs[*]}"
+  export http_proxy="${http_proxy:-}"
+  export https_proxy="${https_proxy:-}"
+  export HTTP_PROXY="${HTTP_PROXY:-}"
+  export HTTPS_PROXY="${HTTPS_PROXY:-}"
+
+  if ! apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false update; then
+    say "apt update failed without proxy. Trying normal apt update."
+    apt-get update
+  fi
+  apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false install -y "${pkgs[@]}" || apt-get install -y "${pkgs[@]}"
+}
+
+prepare_core_binary() {
+  choose_asset
+  mkdir -p "$WORK_DIR"
+  download_file "$ASSET" "$WORK_DIR/mihomo.gz"
+  gzip -dc "$WORK_DIR/mihomo.gz" > "$WORK_DIR/mihomo"
+  chmod 0755 "$WORK_DIR/mihomo"
+  "$WORK_DIR/mihomo" -v
+}
+
+write_rc_local_nat() {
+  local iface="$1"
+  say "Configure rc.local NAT on interface: $iface"
+  backup_file /etc/rc.local
+  cat > /etc/rc.local <<EOF
+#!/bin/sh -e
+echo 1 >/proc/sys/net/ipv4/ip_forward
+iptables -t nat -C POSTROUTING -o ${iface} -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o ${iface} -j MASQUERADE
+exit 0
+EOF
+  chmod +x /etc/rc.local
+  /etc/rc.local
+}
+
+install_standalone_mihomo() {
+  say "Mode: standalone Mihomo side-router"
+  apt_install_if_missing ca-certificates gzip iproute2 iptables procps
+  prepare_core_binary
+
+  mkdir -p "$(dirname "$MIHOMO_BIN")" "$CONFIG_DIR"
+  backup_file "$MIHOMO_BIN"
+  cp "$WORK_DIR/mihomo" "$MIHOMO_BIN"
+  chmod 0755 "$MIHOMO_BIN"
+
+  if [ ! -e "$CONFIG_FILE" ]; then
+    cat > "$CONFIG_FILE" <<'EOF'
+mixed-port: 7890
+allow-lan: true
+bind-address: "*"
+mode: rule
+log-level: info
+external-controller: 0.0.0.0:9090
+ipv6: false
+
+dns:
+  enable: true
+  listen: 0.0.0.0:1053
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+
+proxies: []
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies:
+      - DIRECT
+rules:
+  - MATCH,DIRECT
+EOF
+  else
+    say "Keep existing config: $CONFIG_FILE"
+  fi
+
+  "$MIHOMO_BIN" -t -d "$CONFIG_DIR"
+
+  backup_file /etc/systemd/system/mihomo.service
+  cat > /etc/systemd/system/mihomo.service <<EOF
+[Unit]
+Description=Mihomo Proxy Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+LimitNOFILE=1048576
+ExecStart=${MIHOMO_BIN} -d ${CONFIG_DIR}
+Restart=on-failure
+RestartSec=5
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload
+  systemctl enable --now mihomo
+  write_rc_local_nat "$(detect_egress_iface)"
+}
+
+restart_nexusbox() {
+  say "Restart NexusBox"
+  if have systemctl && systemctl list-unit-files | grep -q '^nexusbox\.service'; then
+    systemctl restart nexusbox || true
+  else
+    pkill -f '^/opt/nexusbox/nexusbox$' 2>/dev/null || true
+    nohup "$NEXUSBOX_BIN" >/opt/nexusbox/var/info.log 2>&1 &
+  fi
+  sleep 3
+}
+
+fix_nexusbox_core() {
+  say "Mode: NexusBox core auto-fix"
+  [ -x "$NEXUSBOX_BIN" ] || die "NexusBox binary not found: $NEXUSBOX_BIN"
+  apt_install_if_missing ca-certificates gzip iproute2 iptables procps
+  prepare_core_binary
+
+  mkdir -p "$(dirname "$NEXUSBOX_CORE")" /opt/nexusbox/var
+  backup_file "$NEXUSBOX_CORE"
+  cp "$WORK_DIR/mihomo" "$NEXUSBOX_CORE"
+  chmod 0755 "$NEXUSBOX_CORE"
+
+  "$NEXUSBOX_CORE" -v
+  "$NEXUSBOX_CORE" -t -d "$NEXUSBOX_CONFIG_DIR"
+
+  write_rc_local_nat "$(detect_egress_iface)"
+  restart_nexusbox
+
+  curl -fsS "http://127.0.0.1:18080/configs?force=true" || true
+}
+
+print_report() {
+  say "Final report"
+  echo "CPU arch: $(uname -m)"
+  echo "Core kind: ${CORE_KIND:-unknown}"
+  echo "Egress iface: $(detect_egress_iface)"
+  echo "ip_forward: $(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || true)"
+  echo
+  echo "NAT:"
+  iptables -t nat -S POSTROUTING 2>/dev/null || true
+  echo
+  echo "Processes:"
+  ps -ef | grep -Ei 'nexusbox|mihomo|clash|sing-box' | grep -v grep || true
+  echo
+  echo "Listening ports:"
+  ss -lntup 2>/dev/null | grep -E '(:7890|:7898|:9090|:1053|:18080)' || true
+  echo
+  if [ -d /opt/nexusbox/var ]; then
+    echo "NexusBox var:"
+    ls -la /opt/nexusbox/var
+  fi
+  echo
+  echo "Log file: $LOG"
+}
+
+main() {
+  require_root
+  say "Mihomo router installer started"
+  say "VERSION=$VERSION MODE=$MODE"
+
+  case "$MODE" in
+    auto)
+      if [ -x "$NEXUSBOX_BIN" ]; then
+        fix_nexusbox_core
+      else
+        install_standalone_mihomo
+      fi
+      ;;
+    nexusbox)
+      fix_nexusbox_core
+      ;;
+    standalone)
+      install_standalone_mihomo
+      ;;
+    *)
+      die "Unknown MODE=$MODE. Use auto, nexusbox, or standalone."
+      ;;
+  esac
+
+  print_report
+  say "DONE"
+}
+
+main "$@"
