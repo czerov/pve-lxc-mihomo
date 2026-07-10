@@ -21,6 +21,12 @@ NEXUSBOX_CORE="${NEXUSBOX_CORE:-/opt/mihomo/mihomo}"
 NEXUSBOX_CONFIG_DIR="${NEXUSBOX_CONFIG_DIR:-/opt/config}"
 NEXUSBOX_DEFAULT_INSTALL_URL="${NEXUSBOX_DEFAULT_INSTALL_URL:-https://raw.githubusercontent.com/Ladavian/NexusBox/main/install.sh}"
 NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-$NEXUSBOX_DEFAULT_INSTALL_URL}"
+NEXUSBOX_PATCHED_ENABLE="${NEXUSBOX_PATCHED_ENABLE:-1}"
+NEXUSBOX_PATCHED_REPO="${NEXUSBOX_PATCHED_REPO:-czerov/pve-lxc-mihomo}"
+NEXUSBOX_PATCHED_BRANCH="${NEXUSBOX_PATCHED_BRANCH:-main}"
+NEXUSBOX_PATCHED_BASE="${NEXUSBOX_PATCHED_BASE:-https://raw.githubusercontent.com/${NEXUSBOX_PATCHED_REPO}/${NEXUSBOX_PATCHED_BRANCH}/bin}"
+NEXUSBOX_PATCHED_URL="${NEXUSBOX_PATCHED_URL:-}"
+NEXUSBOX_PATCHED_SHA256="${NEXUSBOX_PATCHED_SHA256:-}"
 MODE="${MODE:-auto}"
 INSTALL_PROFILE="${INSTALL_PROFILE:-unknown}"
 PREFER_CN_ACCEL="${PREFER_CN_ACCEL:-0}"
@@ -449,6 +455,100 @@ download_nexusbox_installer() {
   die "NexusBox installer download failed. You can retry with NEXUSBOX_INSTALL_URL=<url>."
 }
 
+nexusbox_binary_arch() {
+  case "$(uname -m)" in
+    x86_64|amd64) echo "amd64" ;;
+    aarch64|arm64) echo "arm64" ;;
+    *) return 1 ;;
+  esac
+}
+
+nexusbox_expected_sha256() {
+  case "$1" in
+    amd64) echo "55d2751e8eb81a22005cbca87b50fb15e6b117340f456ad96af442b99ab9c6a4" ;;
+    arm64) echo "ada0bc7d7429462254e809a4f507120f35228977d9fcb79e699eab1658ed690e" ;;
+    *) return 1 ;;
+  esac
+}
+
+file_sha256() {
+  local file="$1"
+  if have sha256sum; then
+    sha256sum "$file" | awk '{print tolower($1)}'
+  elif have openssl; then
+    openssl dgst -sha256 -r "$file" | awk '{print tolower($1)}'
+  else
+    return 1
+  fi
+}
+
+verify_sha256() {
+  local file="$1" expected="$2" actual
+  [ -n "$expected" ] || return 0
+  actual="$(file_sha256 "$file" || true)"
+  [ -n "$actual" ] || die "Cannot verify SHA256 because sha256sum/openssl is missing."
+  expected="$(printf '%s' "$expected" | tr 'A-F' 'a-f')"
+  [ "$actual" = "$expected" ] || die "SHA256 mismatch for $file. expected=$expected actual=$actual"
+}
+
+download_patched_nexusbox_binary() {
+  local output="$1" arch asset raw_url expected urls=()
+  arch="$(nexusbox_binary_arch)" || {
+    say "No patched NexusBox binary for arch $(uname -m); skip patched binary."
+    return 1
+  }
+  asset="nexusbox-linux-${arch}"
+  raw_url="${NEXUSBOX_PATCHED_BASE%/}/${asset}"
+
+  if [ -n "$NEXUSBOX_PATCHED_URL" ]; then
+    urls+=("$NEXUSBOX_PATCHED_URL")
+    expected="$NEXUSBOX_PATCHED_SHA256"
+  else
+    expected="${NEXUSBOX_PATCHED_SHA256:-$(nexusbox_expected_sha256 "$arch")}"
+  fi
+
+  if prefer_cn_accel_enabled; then
+    urls+=(
+      "https://gh-proxy.com/${raw_url}"
+      "https://gh.llkk.cc/${raw_url}"
+      "https://mirror.ghproxy.com/${raw_url}"
+      "https://cdn.jsdelivr.net/gh/${NEXUSBOX_PATCHED_REPO}@${NEXUSBOX_PATCHED_BRANCH}/bin/${asset}"
+      "https://fastly.jsdelivr.net/gh/${NEXUSBOX_PATCHED_REPO}@${NEXUSBOX_PATCHED_BRANCH}/bin/${asset}"
+      "$raw_url"
+    )
+  else
+    urls+=(
+      "$raw_url"
+      "https://cdn.jsdelivr.net/gh/${NEXUSBOX_PATCHED_REPO}@${NEXUSBOX_PATCHED_BRANCH}/bin/${asset}"
+      "https://fastly.jsdelivr.net/gh/${NEXUSBOX_PATCHED_REPO}@${NEXUSBOX_PATCHED_BRANCH}/bin/${asset}"
+      "https://gh.llkk.cc/${raw_url}"
+      "https://gh-proxy.com/${raw_url}"
+      "https://mirror.ghproxy.com/${raw_url}"
+    )
+  fi
+
+  say "Downloading patched NexusBox binary ($arch)"
+  download_best_url "$output" "${urls[@]}" || return 1
+  verify_sha256 "$output" "$expected"
+  chmod 0755 "$output"
+}
+
+install_patched_nexusbox_binary() {
+  case "$NEXUSBOX_PATCHED_ENABLE" in
+    0|false|no|off)
+      say "Patched NexusBox binary disabled by NEXUSBOX_PATCHED_ENABLE=$NEXUSBOX_PATCHED_ENABLE"
+      return 0
+      ;;
+  esac
+
+  local patched="$WORK_DIR/nexusbox-patched"
+  download_patched_nexusbox_binary "$patched" || die "Patched NexusBox download failed. Set NEXUSBOX_PATCHED_ENABLE=0 only if you accept the known Mihomo reload compatibility issue."
+  backup_file "$NEXUSBOX_BIN"
+  cp "$patched" "$NEXUSBOX_BIN"
+  chmod 0755 "$NEXUSBOX_BIN"
+  say "Installed patched NexusBox binary: $NEXUSBOX_BIN"
+}
+
 patch_nexusbox_installer() {
   local file="$1"
   [ -f "$file" ] || return 0
@@ -567,6 +667,60 @@ verify_transparent_runtime() {
   say "Verified transparent TCP redirect: PREROUTING -> ${redir_port}"
 }
 
+reload_nexusbox_core_direct() {
+  local config_file="${1:-${NEXUSBOX_CONFIG_DIR}/config.yaml}"
+  local socket="/opt/nexusbox/var/core.sock"
+  local body
+  body="$(printf '{"path":"%s","payload":""}' "$config_file")"
+
+  for _ in $(seq 1 20); do
+    [ -S "$socket" ] && break
+    sleep 1
+  done
+  [ -S "$socket" ] || die "Mihomo controller socket is missing: $socket"
+
+  curl -fsS --unix-socket "$socket" \
+    -X PUT "http://localhost/configs?force=true" \
+    -H "Content-Type: application/json" \
+    -d "$body" >/dev/null || die "Mihomo config reload failed through $socket."
+  say "Verified Mihomo config reload API"
+}
+
+json_string_value() {
+  local file="$1" key="$2"
+  [ -f "$file" ] || return 0
+  sed -n -E "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"([^\"]*)\".*/\1/p" "$file" | head -1
+}
+
+verify_nexusbox_hot_reload_api() {
+  local config_json="${NEXUSBOX_CONFIG_DIR}/nexusbox.json"
+  local user pass cookie
+  user="$(json_string_value "$config_json" "username")"
+  pass="$(json_string_value "$config_json" "password")"
+  if [ -z "$user" ] || [ -z "$pass" ]; then
+    say "Cannot read NexusBox login from $config_json; skip UI hot reload verification."
+    return 0
+  fi
+  case "${user}${pass}" in
+    *[!A-Za-z0-9._@-]*)
+      say "NexusBox login contains special characters; skip UI hot reload verification."
+      return 0
+      ;;
+  esac
+
+  cookie="$WORK_DIR/nexusbox-cookie.txt"
+  curl -fsS -c "$cookie" \
+    -H "Content-Type: application/json" \
+    -d "{\"username\":\"${user}\",\"password\":\"${pass}\"}" \
+    "http://127.0.0.1:18080/login" >/dev/null || {
+      say "Cannot login to NexusBox locally; skip UI hot reload verification."
+      return 0
+    }
+
+  curl -fsS -b "$cookie" -X PUT "http://127.0.0.1:18080/configs" >/dev/null || die "NexusBox UI hot reload API failed. This usually means the NexusBox binary is not patched for current Mihomo."
+  say "Verified NexusBox UI hot reload API"
+}
+
 verify_standalone_running() {
   say "Verifying standalone Mihomo runtime"
   if have systemctl; then
@@ -588,6 +742,8 @@ verify_nexusbox_running() {
   wait_for_port 18080 "NexusBox UI"
   wait_for_port 7890 "Mihomo mixed proxy"
   wait_for_port 9090 "Mihomo controller API"
+  reload_nexusbox_core_direct "${NEXUSBOX_CONFIG_DIR}/config.yaml"
+  verify_nexusbox_hot_reload_api
   verify_dns_runtime "${NEXUSBOX_CONFIG_DIR}/config.yaml"
   verify_transparent_runtime "${NEXUSBOX_CONFIG_DIR}/config.yaml"
 }
@@ -697,11 +853,12 @@ fix_nexusbox_core() {
   say "Mode: NexusBox core auto-fix"
   INSTALL_PROFILE="nexusbox"
   [ -x "$NEXUSBOX_BIN" ] || die "NexusBox binary not found: $NEXUSBOX_BIN"
-  apt_install_if_missing ca-certificates gzip iproute2 iptables procps
+  apt_install_if_missing ca-certificates curl gzip iproute2 iptables procps
   prepare_core_binary
 
   mkdir -p "$(dirname "$NEXUSBOX_CORE")" /opt/nexusbox/var
   stop_nexusbox_for_core_replace
+  install_patched_nexusbox_binary
   backup_file "$NEXUSBOX_CORE"
   cp "$WORK_DIR/mihomo" "$NEXUSBOX_CORE"
   chmod 0755 "$NEXUSBOX_CORE"
@@ -714,7 +871,7 @@ fix_nexusbox_core() {
   write_rc_local_nat "$(detect_egress_iface)" "$(detect_dns_listen_port "${NEXUSBOX_CONFIG_DIR}/config.yaml" || true)" "$(detect_redir_port "${NEXUSBOX_CONFIG_DIR}/config.yaml" || true)"
   restart_nexusbox
 
-  curl -fsS "http://127.0.0.1:18080/configs?force=true" || true
+  reload_nexusbox_core_direct "${NEXUSBOX_CONFIG_DIR}/config.yaml"
   verify_nexusbox_running
 }
 
@@ -747,7 +904,7 @@ print_report() {
   ps -ef | grep -Ei 'nexusbox|mihomo|clash|sing-box' | grep -v grep || true
   echo
   echo "Listening ports:"
-  ss -lntup 2>/dev/null | grep -E '(:7890|:7898|:9090|:1053|:18080)' || true
+  ss -lntup 2>/dev/null | grep -E '(:7877|:7890|:7896|:7898|:9090|:1053|:6666|:18080)' || true
   echo
   if [ -d /opt/nexusbox/var ]; then
     echo "NexusBox var:"

@@ -30,6 +30,7 @@
 - 自动模式：已有 NexusBox 就修复核心，否则装纯 Mihomo
 - 修复已有 NexusBox 核心
 - 从零安装 NexusBox UI 后修复核心，默认使用 Ladavian/NexusBox 官方安装脚本，并自动尝试 CDN / GitHub 加速源
+- NexusBox 模式会替换为仓库内修补版 NexusBox 二进制，修复当前 mihomo `PUT /configs?force=true` 需要 `payload` 字段导致的 `Body invalid` 热重载失败
 - LXC 代理：关闭、自动探测、手动输入
 
 如果不想交互，可以加 `INTERACTIVE=0` 并用环境变量指定。
@@ -108,7 +109,7 @@ CT_TEMPLATE_NAME=debian-12-standard_12.12-1_amd64.tar.zst bash <(curl -fsSL http
 CT_ROOTFS_STORAGE=local bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-install-cn.sh)
 ```
 
-安装结束前脚本会复查运行状态：进程、systemd 服务、监听端口、`ip_forward` 和 NAT 规则都通过后才打印成功。新建 LXC 默认是纯 Mihomo 模式，不安装 NexusBox，所以没有 `18080` 页面；选择 NexusBox 安装模式后才会开放 `18080` 页面。
+安装结束前脚本会复查运行状态：进程、systemd 服务、监听端口、`ip_forward`、NAT 规则和 mihomo 配置热重载都通过后才打印成功。新建 LXC 默认是纯 Mihomo 模式，不安装 NexusBox，所以没有 `18080` 页面；选择 NexusBox 安装模式后才会开放 `18080` 页面。
 
 如果导入的配置里 `dns.listen` 不是标准 `53` 端口，例如公开默认配置使用 `0.0.0.0:6666`，脚本会自动在 LXC 内持久化 DNS 转发，把客户端访问的 `53/tcp` 和 `53/udp` 转到实际 DNS 端口，并在健康检查里验证这条规则。
 
