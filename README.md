@@ -112,6 +112,8 @@ CT_ROOTFS_STORAGE=local bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve
 
 无代理也可以尝试一键安装。脚本会先探测 GitHub / CDN / `gh-proxy.com` 等加速源并选择可用速度较好的源；国内网络建议从 `pve-install-cn.sh` 启动。若本地网络无法访问 GitHub、jsDelivr 或几个 GitHub 加速源，安装仍可能失败，此时再使用 `LXC_PROXY=auto` 或手动指定代理。
 
+`pve-install-cn.sh` 入口会优先拉取 GitHub raw / GitHub 加速源的新脚本，CDN 只作为兜底，避免 `cdn.jsdelivr.net @main` 缓存旧版脚本导致菜单或逻辑不是最新。
+
 如果容器内下载慢，可以让自动安装流程先配置 LXC 代理，再安装 Mihomo / NexusBox：
 
 ```bash
