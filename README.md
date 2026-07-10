@@ -108,6 +108,8 @@ CT_ROOTFS_STORAGE=local bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve
 
 安装结束前脚本会复查运行状态：进程、systemd 服务、监听端口、`ip_forward` 和 NAT 规则都通过后才打印成功。新建 LXC 默认是纯 Mihomo 模式，不安装 NexusBox，所以没有 `18080` 页面；选择 NexusBox 安装模式后才会开放 `18080` 页面。
 
+如果导入的配置里 `dns.listen` 不是标准 `53` 端口，例如公开默认配置使用 `0.0.0.0:6666`，脚本会自动在 LXC 内持久化 DNS 转发，把客户端访问的 `53/tcp` 和 `53/udp` 转到实际 DNS 端口，并在健康检查里验证这条规则。
+
 如果容器内下载慢，可以让自动安装流程先配置 LXC 代理，再安装 Mihomo / NexusBox：
 
 ```bash

@@ -48,6 +48,26 @@ set_yaml_scalar() {
   fi
 }
 
+detect_dns_listen_port() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+  awk '
+    /^dns:/ { in_dns=1; next }
+    in_dns && /^[^[:space:]]/ { in_dns=0 }
+    in_dns && /^[[:space:]]*listen:[[:space:]]*/ {
+      value=$0
+      sub(/^[[:space:]]*listen:[[:space:]]*/, "", value)
+      sub(/[[:space:]]*#.*/, "", value)
+      gsub(/["'\'' ]/, "", value)
+      n=split(value, parts, ":")
+      if (n > 0 && parts[n] ~ /^[0-9]+$/) {
+        print parts[n]
+      }
+      exit
+    }
+  ' "$file"
+}
+
 require_root() {
   [ "$(id -u)" = "0" ] || die "Please run as root."
 }
@@ -244,13 +264,17 @@ prepare_core_binary() {
 }
 
 write_rc_local_nat() {
-  local iface="$1"
+  local iface="$1" dns_port="${2:-}"
   say "Configure rc.local NAT on interface: $iface"
   backup_file /etc/rc.local
   cat > /etc/rc.local <<EOF
 #!/bin/sh -e
 echo 1 >/proc/sys/net/ipv4/ip_forward
 iptables -t nat -C POSTROUTING -o ${iface} -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o ${iface} -j MASQUERADE
+if [ -n "${dns_port}" ] && [ "${dns_port}" != "53" ]; then
+  iptables -t nat -C PREROUTING -p udp --dport 53 -j REDIRECT --to-ports ${dns_port} 2>/dev/null || iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports ${dns_port}
+  iptables -t nat -C PREROUTING -p tcp --dport 53 -j REDIRECT --to-ports ${dns_port} 2>/dev/null || iptables -t nat -A PREROUTING -p tcp --dport 53 -j REDIRECT --to-ports ${dns_port}
+fi
 exit 0
 EOF
   chmod +x /etc/rc.local
@@ -274,6 +298,21 @@ wait_for_port() {
   die "$name is not listening on port $port."
 }
 
+verify_dns_runtime() {
+  local config_file="$1" dns_port
+  dns_port="$(detect_dns_listen_port "$config_file" || true)"
+  [ -n "$dns_port" ] || {
+    say "No dns.listen found in $config_file; skip DNS port verification"
+    return 0
+  }
+
+  wait_for_port "$dns_port" "Mihomo DNS"
+  if [ "$dns_port" != "53" ]; then
+    iptables -t nat -S PREROUTING 2>/dev/null | grep -Eq -- "--dport 53 .*--to-ports ${dns_port}" || die "DNS redirect 53 -> ${dns_port} is missing."
+    say "Verified DNS redirect: 53 -> ${dns_port}"
+  fi
+}
+
 verify_standalone_running() {
   say "Verifying standalone Mihomo runtime"
   if have systemctl; then
@@ -285,7 +324,7 @@ verify_standalone_running() {
   pgrep -f "${MIHOMO_BIN} -d ${CONFIG_DIR}" >/dev/null || die "Mihomo process was not found."
   wait_for_port 7890 "Mihomo mixed proxy"
   wait_for_port 9090 "Mihomo controller API"
-  wait_for_port 1053 "Mihomo DNS"
+  verify_dns_runtime "$CONFIG_FILE"
 }
 
 verify_nexusbox_running() {
@@ -294,6 +333,7 @@ verify_nexusbox_running() {
   wait_for_port 18080 "NexusBox UI"
   wait_for_port 7890 "Mihomo mixed proxy"
   wait_for_port 9090 "Mihomo controller API"
+  verify_dns_runtime "${NEXUSBOX_CONFIG_DIR}/config.yaml"
 }
 
 install_standalone_mihomo() {
@@ -366,7 +406,7 @@ EOF
 
   systemctl daemon-reload
   systemctl enable --now mihomo
-  write_rc_local_nat "$(detect_egress_iface)"
+  write_rc_local_nat "$(detect_egress_iface)" "$(detect_dns_listen_port "$CONFIG_FILE" || true)"
   verify_standalone_running
 }
 
@@ -415,7 +455,7 @@ fix_nexusbox_core() {
   "$NEXUSBOX_CORE" -v
   "$NEXUSBOX_CORE" -t -d "$NEXUSBOX_CONFIG_DIR"
 
-  write_rc_local_nat "$(detect_egress_iface)"
+  write_rc_local_nat "$(detect_egress_iface)" "$(detect_dns_listen_port "${NEXUSBOX_CONFIG_DIR}/config.yaml" || true)"
   restart_nexusbox
 
   curl -fsS "http://127.0.0.1:18080/configs?force=true" || true

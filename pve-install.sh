@@ -645,19 +645,56 @@ check_port() {
   fi
 }
 
+detect_dns_port() {
+  config_file="$1"
+  [ -f "$config_file" ] || return 0
+  awk '
+    /^dns:/ { in_dns=1; next }
+    in_dns && /^[^[:space:]]/ { in_dns=0 }
+    in_dns && /^[[:space:]]*listen:[[:space:]]*/ {
+      value=$0
+      sub(/^[[:space:]]*listen:[[:space:]]*/, "", value)
+      sub(/[[:space:]]*#.*/, "", value)
+      gsub(/["'\'' ]/, "", value)
+      n=split(value, parts, ":")
+      if (n > 0 && parts[n] ~ /^[0-9]+$/) {
+        print parts[n]
+      }
+      exit
+    }
+  ' "$config_file"
+}
+
+check_dns_runtime() {
+  config_file="$1"
+  dns_port="$(detect_dns_port "$config_file" || true)"
+  if [ -z "$dns_port" ]; then
+    echo "warn: dns.listen not found in ${config_file}"
+    return 0
+  fi
+  check_port "$dns_port" "Mihomo DNS"
+  if [ "$dns_port" != "53" ]; then
+    if iptables -t nat -S PREROUTING 2>/dev/null | grep -Eq -- "--dport 53 .*--to-ports ${dns_port}"; then
+      echo "ok: DNS redirect 53 -> ${dns_port}"
+    else
+      echo "fail: DNS redirect 53 -> ${dns_port}"
+      fail=1
+    fi
+  fi
+}
+
 if [ "$profile" = "nexusbox" ]; then
   check_cmd "NexusBox process" pgrep -f /opt/nexusbox/nexusbox
   check_port 18080 "NexusBox UI"
+  check_dns_runtime /opt/config/config.yaml
 else
   check_cmd "mihomo.service active" systemctl is-active --quiet mihomo
   check_cmd "Mihomo process" pgrep -f "/usr/local/bin/mihomo -d /etc/mihomo"
+  check_dns_runtime /etc/mihomo/config.yaml
 fi
 
 check_port 7890 "Mihomo mixed proxy"
 check_port 9090 "Mihomo controller API"
-if [ "$profile" = "standalone" ]; then
-  check_port 1053 "Mihomo DNS"
-fi
 
 if [ "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo 0)" = "1" ]; then
   echo "ok: ip_forward enabled"
