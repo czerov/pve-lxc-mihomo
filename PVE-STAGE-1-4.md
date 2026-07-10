@@ -113,6 +113,8 @@ LXC_PROXY_COMMON_PORTS="7897 7890 7891 7892 1080 20171"
 - 自动选择同网段可用 LXC IP。
 - 自动优先查找本地 `debian-13-standard_13.1-2_amd64.tar.zst` 模板。
 - 如果指定模板不存在，则查找 Debian 13 amd64 模板，再回退 Debian 12 amd64 模板。
+- 本地没有指定模板时，默认 `TEMPLATE_MIRROR=auto` 自动测速清华 TUNA、中科大 USTC、南京大学 NJU、Proxmox 官方源，并选择最快可用源。
+- 镜像下载失败会自动换下一个；全部失败再回退到 `pveam download`。
 - 本地没有模板时自动用 `pveam download` 下载。
 - 用 `pct create` 创建 Debian LXC。
 
@@ -133,7 +135,8 @@ CT_MEMORY=512
 CT_SWAP=0
 CT_DISK_SIZE=8
 CT_TEMPLATE_NAME=debian-13-standard_13.1-2_amd64.tar.zst
-TEMPLATE_URL=空，未找到本地模板时使用 pveam 下载 Debian 13 模板；如果 PVE 源没有 Debian 13，再回退到 Debian 12
+TEMPLATE_MIRROR=auto
+TEMPLATE_URL=空，优先自动测速镜像并下载指定模板；镜像不可用时使用 pveam 下载 Debian 13 模板；如果 PVE 源没有 Debian 13，再回退到 Debian 12
 ```
 
 如果 `download.proxmox.com` 很慢，可以设置 `TEMPLATE_URL` 指定模板下载地址。

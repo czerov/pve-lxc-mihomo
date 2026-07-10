@@ -79,6 +79,21 @@ bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-ins
 debian-13-standard_13.1-2_amd64.tar.zst
 ```
 
+如果本地没有这个模板，默认 `TEMPLATE_MIRROR=auto` 会自动测速并选择最快可用源：
+
+```text
+清华 TUNA
+中科大 USTC
+南京大学 NJU
+Proxmox 官方源
+```
+
+下载失败会自动换下一个源。也可以手动关闭镜像测速下载，改回 PVE 自带 `pveam download`：
+
+```bash
+TEMPLATE_MIRROR=pveam bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-install-cn.sh)
+```
+
 如果要指定其他本地模板，可以设置：
 
 ```bash

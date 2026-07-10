@@ -29,6 +29,7 @@ CT_DISK_SIZE="${CT_DISK_SIZE:-8}"
 CT_ROOTFS_STORAGE="${CT_ROOTFS_STORAGE:-}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
 CT_TEMPLATE_NAME="${CT_TEMPLATE_NAME:-debian-13-standard_13.1-2_amd64.tar.zst}"
+TEMPLATE_MIRROR="${TEMPLATE_MIRROR:-auto}"
 TEMPLATE_URL="${TEMPLATE_URL:-}"
 CT_PASSWORD="${CT_PASSWORD:-}"
 CT_DNS="${CT_DNS:-223.5.5.5}"
@@ -346,6 +347,76 @@ download_with_fallback() {
   return 1
 }
 
+template_path_for_name() {
+  local name="$1" path
+  path="$(pvesm path "${CT_TEMPLATE_STORAGE}:vztmpl/${name}" 2>/dev/null || true)"
+  if [ -z "$path" ]; then
+    path="/var/lib/vz/template/cache/${name}"
+  fi
+  printf '%s' "$path"
+}
+
+download_template_from_mirrors() {
+  local name="$1" output="$2" url best_url="" best_speed="0" speed
+  local urls=() usable_urls=()
+
+  if [ "$TEMPLATE_MIRROR" = "off" ] || [ "$TEMPLATE_MIRROR" = "pveam" ]; then
+    return 1
+  fi
+
+  if [ "$TEMPLATE_MIRROR" != "auto" ]; then
+    urls+=("${TEMPLATE_MIRROR%/}/${name}")
+  fi
+
+  urls+=(
+    "https://mirrors.tuna.tsinghua.edu.cn/proxmox/images/system/${name}"
+    "https://mirrors.ustc.edu.cn/proxmox/images/system/${name}"
+    "https://mirror.nju.edu.cn/proxmox/images/system/${name}"
+    "https://download.proxmox.com/images/system/${name}"
+  )
+
+  mkdir -p "$(dirname "$output")"
+  for url in "${urls[@]}"; do
+    say "Check template mirror: $url"
+    if ! curl -fsI --connect-timeout 8 --max-time 15 "$url" >/dev/null 2>&1; then
+      say "Mirror unavailable: $url"
+      continue
+    fi
+    speed="$(curl -fL --range 0-1048575 --connect-timeout 8 --max-time 15 -o /dev/null -w '%{speed_download}' "$url" 2>/dev/null || true)"
+    speed="${speed%.*}"
+    case "$speed" in
+      ''|*[!0-9]*) speed=0 ;;
+    esac
+    say "Mirror speed sample: ${speed} B/s"
+    usable_urls+=("$url")
+    if awk "BEGIN {exit !($speed > $best_speed)}"; then
+      best_speed="$speed"
+      best_url="$url"
+    fi
+  done
+
+  [ "${#usable_urls[@]}" -gt 0 ] || return 1
+
+  if [ -n "$best_url" ]; then
+    say "Selected fastest template mirror: $best_url (${best_speed} B/s)"
+    if curl -fL --connect-timeout 15 --retry 2 -o "$output" "$best_url"; then
+      [ -s "$output" ] && return 0
+    fi
+    say "Fastest mirror download failed, trying remaining mirrors."
+  fi
+
+  for url in "${usable_urls[@]}"; do
+    [ "$url" != "$best_url" ] || continue
+    say "Downloading LXC template from mirror: $url"
+    if curl -fL --connect-timeout 15 --retry 2 -o "$output" "$url"; then
+      [ -s "$output" ] || continue
+      return 0
+    fi
+    say "Template download failed, trying next mirror."
+  done
+  return 1
+}
+
 choose_template() {
   local existing latest
   if [ -n "$TEMPLATE_URL" ]; then
@@ -353,10 +424,7 @@ choose_template() {
     filename="${TEMPLATE_URL%%\?*}"
     filename="${filename##*/}"
     [ -n "$filename" ] || die "Cannot parse template filename from TEMPLATE_URL."
-    template_path="$(pvesm path "${CT_TEMPLATE_STORAGE}:vztmpl/${filename}" 2>/dev/null || true)"
-    if [ -z "$template_path" ]; then
-      template_path="/var/lib/vz/template/cache/${filename}"
-    fi
+    template_path="$(template_path_for_name "$filename")"
     mkdir -p "$(dirname "$template_path")"
     if [ ! -s "$template_path" ]; then
       say "Downloading LXC template from TEMPLATE_URL: $TEMPLATE_URL"
@@ -373,10 +441,8 @@ choose_template() {
     existing="$(pveam list "$CT_TEMPLATE_STORAGE" 2>/dev/null | awk -v name="$CT_TEMPLATE_NAME" '$1 == name || $1 == "vztmpl/" name || $1 ~ ("/" name "$") {print $1; exit}' || true)"
     if [ -z "$existing" ]; then
       local template_path
-      template_path="$(pvesm path "${CT_TEMPLATE_STORAGE}:vztmpl/${CT_TEMPLATE_NAME}" 2>/dev/null || true)"
+      template_path="$(template_path_for_name "$CT_TEMPLATE_NAME")"
       if [ -n "$template_path" ] && [ -s "$template_path" ]; then
-        existing="${CT_TEMPLATE_STORAGE}:vztmpl/${CT_TEMPLATE_NAME}"
-      elif [ -s "/var/lib/vz/template/cache/${CT_TEMPLATE_NAME}" ]; then
         existing="${CT_TEMPLATE_STORAGE}:vztmpl/${CT_TEMPLATE_NAME}"
       fi
     fi
@@ -386,6 +452,13 @@ choose_template() {
       return 0
     fi
     say "Preferred template was not found locally: $CT_TEMPLATE_NAME"
+    local preferred_path
+    preferred_path="$(template_path_for_name "$CT_TEMPLATE_NAME")"
+    if download_template_from_mirrors "$CT_TEMPLATE_NAME" "$preferred_path"; then
+      TEMPLATE="${CT_TEMPLATE_STORAGE}:vztmpl/${CT_TEMPLATE_NAME}"
+      say "Use downloaded preferred template: $TEMPLATE"
+      return 0
+    fi
   fi
 
   existing="$(pveam list "$CT_TEMPLATE_STORAGE" 2>/dev/null | awk '/debian-13-standard.*amd64.*(tar.zst|tar.gz)/{print $1}' | sort -V | tail -1 || true)"
