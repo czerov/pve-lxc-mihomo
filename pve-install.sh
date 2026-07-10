@@ -14,7 +14,13 @@ INSTALL_URL="${INSTALL_URL:-${RAW_BASE}/install.sh}"
 PROXY_URL="${PROXY_URL:-${RAW_BASE}/proxy.sh}"
 GH_PROXY="${GH_PROXY:-}"
 
+if [ "${CTID+x}" = "x" ]; then
+  CTID_WAS_SET=1
+else
+  CTID_WAS_SET=0
+fi
 CTID="${CTID:-109}"
+AUTO_CTID="${AUTO_CTID:-auto}"
 USE_EXISTING="${USE_EXISTING:-0}"
 EXISTING_CTID="${EXISTING_CTID:-}"
 [ -n "$EXISTING_CTID" ] && { CTID="$EXISTING_CTID"; USE_EXISTING=1; }
@@ -215,14 +221,60 @@ detect_storage() {
   say "Using rootfs storage: $CT_ROOTFS_STORAGE"
 }
 
+vmid_exists() {
+  local vmid="$1"
+  pct status "$vmid" >/dev/null 2>&1 && return 0
+  have qm && qm status "$vmid" >/dev/null 2>&1 && return 0
+  [ -e "/etc/pve/lxc/${vmid}.conf" ] && return 0
+  [ -e "/etc/pve/qemu-server/${vmid}.conf" ] && return 0
+  return 1
+}
+
+auto_ctid_enabled() {
+  case "$AUTO_CTID" in
+    1|true|yes|on) return 0 ;;
+    0|false|no|off) return 1 ;;
+    auto|"") [ "$CTID_WAS_SET" != "1" ] ;;
+    *) die "Invalid AUTO_CTID=$AUTO_CTID. Use auto, 1, or 0." ;;
+  esac
+}
+
+find_free_ctid() {
+  local start="$1" candidate
+  case "$start" in
+    ''|*[!0-9]*) die "CTID must be numeric for automatic CTID selection: $start" ;;
+  esac
+
+  candidate="$((10#$start))"
+  while [ "$candidate" -le 999999 ]; do
+    if ! vmid_exists "$candidate"; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+    candidate="$((candidate + 1))"
+  done
+  return 1
+}
+
 confirm_new_ctid() {
-  if pct status "$CTID" >/dev/null 2>&1; then
-    die "CTID $CTID already exists. Use another one, for example: CTID=110 bash pve-install.sh"
+  case "$CTID" in
+    ''|*[!0-9]*) die "CTID must be numeric: $CTID" ;;
+  esac
+
+  if vmid_exists "$CTID"; then
+    if auto_ctid_enabled; then
+      local old_ctid="$CTID"
+      CTID="$(find_free_ctid "$((10#$CTID + 1))")" || die "No free CTID found after $old_ctid."
+      say "CTID $old_ctid already exists; selected free CTID: $CTID"
+      return 0
+    fi
+    die "CTID $CTID already exists. Set AUTO_CTID=1 to choose the next free CTID, or use USE_EXISTING=1 CTID=$CTID to install into the existing LXC."
   fi
+  say "Selected CTID: $CTID"
 }
 
 confirm_existing_ctid() {
-  if ! pct status "$CTID" >/dev/null 2>&1; then
+  if ! vmid_exists "$CTID"; then
     die "Existing CTID $CTID was not found. Check CTID or use new-container mode."
   fi
 }
@@ -255,8 +307,21 @@ int_to_ip() {
   printf '%d.%d.%d.%d' "$(( (n >> 24) & 255 ))" "$(( (n >> 16) & 255 ))" "$(( (n >> 8) & 255 ))" "$(( n & 255 ))"
 }
 
+ip_in_pve_config() {
+  local ip="$1" ip_re conf
+  ip_re="${ip//./\\.}"
+  for conf in /etc/pve/lxc/*.conf /etc/pve/qemu-server/*.conf; do
+    [ -e "$conf" ] || continue
+    if grep -Eq "(^|[,[:space:]])(ip|ipconfig[0-9]+)=${ip_re}(/|,|$)" "$conf"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 ip_in_use() {
   local ip="$1"
+  ip_in_pve_config "$ip" && return 0
   ping -c 1 -W 1 "$ip" >/dev/null 2>&1 && return 0
   ip neigh show "$ip" 2>/dev/null | awk '
     /lladdr/ && $0 !~ /(FAILED|INCOMPLETE)/ { found = 1 }
@@ -873,8 +938,8 @@ main() {
     confirm_existing_ctid
     detect_existing_container_network
   else
-    detect_network
     confirm_new_ctid
+    detect_network
     choose_template
     create_container
   fi

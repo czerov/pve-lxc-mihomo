@@ -60,6 +60,8 @@ bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-ins
 bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
 ```
 
+默认从 `CTID=109` 开始创建；如果 109 已存在，会自动选择下一个空闲 CTID。手动传入 `CTID=xxx` 时默认严格使用该 ID，若希望从指定 ID 往后找空闲 ID，可以加 `AUTO_CTID=1`。
+
 也可以手动指定：
 
 ```bash
