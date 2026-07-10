@@ -48,6 +48,37 @@ set_yaml_scalar() {
   fi
 }
 
+set_json_string_field() {
+  local file="$1" key="$2" value="$3"
+  [ -f "$file" ] || return 0
+
+  if grep -q "\"${key}\"[[:space:]]*:" "$file"; then
+    sed -i -E "s|(\"${key}\"[[:space:]]*:[[:space:]]*)\"[^\"]*\"|\\1\"${value}\"|" "$file"
+    return 0
+  fi
+
+  local tmp="${file}.tmp.$$"
+  awk -v key="$key" -v value="$value" '
+    !done && /^[[:space:]]*\{/ {
+      print
+      print "  \"" key "\": \"" value "\","
+      done=1
+      next
+    }
+    { print }
+  ' "$file" > "$tmp"
+  mv "$tmp" "$file"
+}
+
+set_nexusbox_merge_mode() {
+  local file="${NEXUSBOX_CONFIG_DIR}/nexusbox.json"
+  [ -f "$file" ] || return 0
+  backup_file "$file"
+  set_json_string_field "$file" "mode" "merge"
+  set_json_string_field "$file" "rule_group" "full"
+  say "NexusBox subscription mode set to merge so subscriptions provide nodes only."
+}
+
 detect_dns_listen_port() {
   local file="$1"
   [ -f "$file" ] || return 0
@@ -195,6 +226,7 @@ import_config_from_url() {
   if [ "$profile" = "nexusbox" ]; then
     set_yaml_scalar "$target" "external-controller-unix" "'/opt/nexusbox/var/core.sock'"
     set_yaml_scalar "$target" "external-ui" "ui/meta"
+    set_nexusbox_merge_mode
   fi
 }
 
