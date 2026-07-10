@@ -92,7 +92,7 @@ LXC_PROXY=disable   清理容器内代理配置
 LXC_PROXY_ADDR=IP:端口
 LXC_PROXY_PORT=7897
 LXC_PROXY_COMMON_PORTS="7897 7890 7891 7892 1080 20171"
-CONFIG_URL=https://example.com/config.yaml，自动导入自定义规则配置
+CONFIG_URL=默认使用仓库公开 config.yaml；可设置为自定义 URL；设置 off 可关闭导入
 ```
 
 已有容器模式会：

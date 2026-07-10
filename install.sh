@@ -158,6 +158,7 @@ download_url_with_fallback() {
 import_config_from_url() {
   local target="$1" profile="$2"
   [ -n "$CONFIG_URL" ] || return 0
+  [ "$CONFIG_URL" != "off" ] && [ "$CONFIG_URL" != "none" ] && [ "$CONFIG_URL" != "0" ] || return 0
 
   local downloaded="$WORK_DIR/config.yaml"
   say "Importing custom config for $profile"
