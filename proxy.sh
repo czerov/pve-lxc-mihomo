@@ -13,7 +13,8 @@ fi
 APT_CONF="${APT_CONF:-/etc/apt/apt.conf.d/99proxy}"
 PROFILE_CONF="${PROFILE_CONF:-/etc/profile.d/lxc-proxy.sh}"
 DEFAULT_PORT="${PROXY_PORT:-7897}"
-COMMON_PORTS="${COMMON_PORTS:-7897 7890 7891 7892 1080 20171}"
+COMMON_PORTS="${COMMON_PORTS:-7897 7890 7891 7892 7893 7895 7896 7899 1080 10808 10809 20170 20171}"
+PROXY_PROBE_TIMEOUT="${PROXY_PROBE_TIMEOUT:-0.5}"
 
 if [ -t 1 ]; then
   RED='\033[0;31m'
@@ -57,16 +58,75 @@ detect_subnet_prefix() {
 
 tcp_probe() {
   local host="$1" port="$2"
-  timeout 1 bash -c "cat < /dev/null > /dev/tcp/${host}/${port}" >/dev/null 2>&1
+  timeout "$PROXY_PROBE_TIMEOUT" bash -c "cat < /dev/null > /dev/tcp/${host}/${port}" >/dev/null 2>&1
+}
+
+strip_candidate() {
+  local input="$1"
+  case "$input" in
+    *://*) input="${input#*://}" ;;
+  esac
+  input="${input%%/*}"
+  input="${input%%\?*}"
+  input="${input##*@}"
+  input="${input#[}"
+  input="${input%]}"
+  printf '%s' "$input" | tr -d '()[]'
+}
+
+candidate_host() {
+  local candidate
+  candidate="$(strip_candidate "$1")"
+  [ -n "$candidate" ] || return 1
+  if printf '%s' "$candidate" | grep -Eq '^[^:]+:[0-9]+$'; then
+    candidate="${candidate%:*}"
+  fi
+  case "$candidate" in
+    ''|localhost|127.*|0.0.0.0|::1) return 1 ;;
+  esac
+  printf '%s' "$candidate"
+}
+
+candidate_port() {
+  local candidate
+  candidate="$(strip_candidate "$1")"
+  if printf '%s' "$candidate" | grep -Eq '^[^:]+:[0-9]+$'; then
+    printf '%s' "${candidate##*:}"
+    return 0
+  fi
+  return 1
 }
 
 normalize_addr() {
-  local input="$1"
-  if printf '%s' "$input" | grep -q ':'; then
-    printf '%s' "$input"
-  else
-    printf '%s:%s' "$input" "$DEFAULT_PORT"
+  local input="$1" host port
+  host="$(candidate_host "$input" || true)"
+  [ -n "$host" ] || return 1
+  port="$(candidate_port "$input" || true)"
+  [ -n "$port" ] || port="$DEFAULT_PORT"
+  printf '%s:%s' "$host" "$port"
+}
+
+try_proxy_candidate() {
+  local input="$1" host port
+  host="$(candidate_host "$input" || true)"
+  [ -n "$host" ] || return 1
+
+  port="$(candidate_port "$input" || true)"
+  if [ -n "$port" ]; then
+    if tcp_probe "$host" "$port"; then
+      printf '%s:%s' "$host" "$port"
+      return 0
+    fi
+    return 1
   fi
+
+  for port in $COMMON_PORTS; do
+    if tcp_probe "$host" "$port"; then
+      printf '%s:%s' "$host" "$port"
+      return 0
+    fi
+  done
+  return 1
 }
 
 auto_detect_proxy() {
@@ -91,40 +151,61 @@ auto_detect_proxy() {
 }
 
 auto_detect_online_proxy() {
-  local gw prefix host port candidate
+  local gw prefix host candidate token detected
 
   if [ -n "${PROXY_ADDR:-}" ]; then
-    candidate="$(normalize_addr "$PROXY_ADDR")"
-    host="${candidate%:*}"
-    port="${candidate##*:}"
-    if tcp_probe "$host" "$port"; then
-      printf '%s' "$candidate"
+    if detected="$(try_proxy_candidate "$PROXY_ADDR")"; then
+      printf '%s' "$detected"
       return 0
     fi
-    return 1
+  fi
+
+  for token in ${PROXY_HINTS:-} ${PVE_PROXY_HINTS:-} ${http_proxy:-} ${https_proxy:-} ${HTTP_PROXY:-} ${HTTPS_PROXY:-}; do
+    if detected="$(try_proxy_candidate "$token")"; then
+      printf '%s' "$detected"
+      return 0
+    fi
+  done
+
+  if [ -n "${SSH_CLIENT:-}" ]; then
+    token="$(printf '%s' "$SSH_CLIENT" | awk '{print $1}')"
+    if detected="$(try_proxy_candidate "$token")"; then
+      printf '%s' "$detected"
+      return 0
+    fi
+  fi
+
+  if [ -n "${SSH_CONNECTION:-}" ]; then
+    token="$(printf '%s' "$SSH_CONNECTION" | awk '{print $1}')"
+    if detected="$(try_proxy_candidate "$token")"; then
+      printf '%s' "$detected"
+      return 0
+    fi
   fi
 
   gw="$(detect_gateway || true)"
-  if [ -n "$gw" ]; then
-    for port in $COMMON_PORTS; do
-      if tcp_probe "$gw" "$port"; then
-        printf '%s:%s' "$gw" "$port"
-        return 0
-      fi
-    done
+  if [ -n "$gw" ] && detected="$(try_proxy_candidate "$gw")"; then
+    printf '%s' "$detected"
+    return 0
   fi
+
+  while read -r host; do
+    [ -n "$host" ] || continue
+    if detected="$(try_proxy_candidate "$host")"; then
+      printf '%s' "$detected"
+      return 0
+    fi
+  done < <(awk '/^nameserver[[:space:]]+/ {print $2}' /etc/resolv.conf 2>/dev/null || true)
 
   prefix="$(detect_subnet_prefix || true)"
   if [ -n "$prefix" ]; then
-    for host in 1 2 5 9 10 100 101 102 200; do
+    for host in 1 2 3 4 5 8 9 10 20 50 100 101 102 106 110 111 122 150 199 200 201 254; do
       candidate="${prefix}.${host}"
       [ "$candidate" = "$gw" ] && continue
-      for port in $COMMON_PORTS; do
-        if tcp_probe "$candidate" "$port"; then
-          printf '%s:%s' "$candidate" "$port"
-          return 0
-        fi
-      done
+      if detected="$(try_proxy_candidate "$candidate")"; then
+        printf '%s' "$detected"
+        return 0
+      fi
     done
   fi
 
@@ -260,7 +341,7 @@ Usage:
 Environment:
   PROXY_ADDR=192.168.1.100:7897
   PROXY_PORT=7897
-  COMMON_PORTS="7897 7890 7891 7892"
+  COMMON_PORTS="7897 7890 7891 7892 7893 7895 7896 7899 1080 10808 10809 20170 20171"
 EOF
 }
 

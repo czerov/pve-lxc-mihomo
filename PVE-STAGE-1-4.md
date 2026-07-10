@@ -72,7 +72,7 @@ USE_EXISTING=1 CTID=109 bash <(curl -fsSL https://raw.githubusercontent.com/czer
 LXC_PROXY=auto bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
 ```
 
-`LXC_PROXY=auto` 会在容器内探测网关和常见端口，只有探测到在线代理才启用；没有探测到就继续直连安装。
+`LXC_PROXY=auto` 会把 PVE 当前 SSH/FinalShell 来源 IP、PVE 邻居表、网关、DNS 和常见 Clash/Mihomo 端口传入容器探测，只有探测到在线代理才启用；没有探测到就继续直连安装。
 
 手动指定代理：
 
@@ -91,7 +91,7 @@ LXC_PROXY=on        开启代理，可配合 LXC_PROXY_ADDR
 LXC_PROXY=disable   清理容器内代理配置
 LXC_PROXY_ADDR=IP:端口
 LXC_PROXY_PORT=7897
-LXC_PROXY_COMMON_PORTS="7897 7890 7891 7892 1080 20171"
+LXC_PROXY_COMMON_PORTS="7897 7890 7891 7892 7893 7895 7896 7899 1080 10808 10809 20170 20171"
 CONFIG_URL=默认使用仓库公开 config.yaml；可设置为自定义 URL；设置 off 可关闭导入
 ```
 

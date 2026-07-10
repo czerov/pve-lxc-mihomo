@@ -110,7 +110,7 @@ CT_ROOTFS_STORAGE=local bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve
 
 如果导入的配置里 `dns.listen` 不是标准 `53` 端口，例如公开默认配置使用 `0.0.0.0:6666`，脚本会自动在 LXC 内持久化 DNS 转发，把客户端访问的 `53/tcp` 和 `53/udp` 转到实际 DNS 端口，并在健康检查里验证这条规则。
 
-无代理也可以尝试一键安装。脚本会优先使用当前网络能访问的 GitHub / CDN / 加速源；国内网络建议从 `pve-install-cn.sh` 启动。若本地网络无法访问 GitHub、jsDelivr 或几个 GitHub 加速源，安装仍可能失败，此时再使用 `LXC_PROXY=auto` 或手动指定代理。
+无代理也可以尝试一键安装。脚本会先探测 GitHub / CDN / `gh-proxy.com` 等加速源并选择可用速度较好的源；国内网络建议从 `pve-install-cn.sh` 启动。若本地网络无法访问 GitHub、jsDelivr 或几个 GitHub 加速源，安装仍可能失败，此时再使用 `LXC_PROXY=auto` 或手动指定代理。
 
 如果容器内下载慢，可以让自动安装流程先配置 LXC 代理，再安装 Mihomo / NexusBox：
 
@@ -136,7 +136,7 @@ bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-ins
 CONFIG_URL=off bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-install-cn.sh)
 ```
 
-`auto` 只会在容器内探测到在线代理时启用。也可以强制指定代理：
+`auto` 会把 PVE 当前 SSH/FinalShell 来源 IP、PVE 邻居表、网关、DNS 和常见 Clash/Mihomo 端口传入 LXC 逐个探测；只有探测到在线代理时才启用。也可以强制指定代理：
 
 ```bash
 LXC_PROXY=on LXC_PROXY_ADDR=192.168.1.100:7897 bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)

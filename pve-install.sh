@@ -38,7 +38,7 @@ VERSION="${VERSION:-latest}"
 LXC_PROXY="${LXC_PROXY:-off}"
 LXC_PROXY_ADDR="${LXC_PROXY_ADDR:-}"
 LXC_PROXY_PORT="${LXC_PROXY_PORT:-7897}"
-LXC_PROXY_COMMON_PORTS="${LXC_PROXY_COMMON_PORTS:-7897 7890 7891 7892 1080 20171}"
+LXC_PROXY_COMMON_PORTS="${LXC_PROXY_COMMON_PORTS:-7897 7890 7891 7892 7893 7895 7896 7899 1080 10808 10809 20170 20171}"
 LXC_PROXY_HTTP=""
 INSTALL_PROFILE="unknown"
 INTERACTIVE="${INTERACTIVE:-auto}"
@@ -63,6 +63,72 @@ backup_file() {
     cp -a "$path" "${path}.bak-${ts}"
     say "Backed up $path -> ${path}.bak-${ts}"
   fi
+}
+
+fetch_url() {
+  local url="$1" output="$2"
+  curl -fL --connect-timeout 20 --retry 2 -o "$output" "$url"
+}
+
+probe_download_source() {
+  local url="$1" speed
+  speed="$(curl -fL --range 0-65535 --connect-timeout 8 --max-time 15 -o /dev/null -w '%{speed_download}' "$url" 2>/dev/null || true)"
+  speed="${speed%.*}"
+  case "$speed" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  [ "$speed" -gt 0 ] || return 1
+  printf '%s' "$speed"
+}
+
+download_best_url() {
+  local output="$1" url speed best_url="" best_speed="0"
+  shift
+  local usable_urls=()
+
+  say "Probing download sources"
+  for url in "$@"; do
+    [ -n "$url" ] || continue
+    say "Check: $url"
+    speed="$(probe_download_source "$url" || true)"
+    if [ -z "$speed" ]; then
+      say "Unavailable: $url"
+      continue
+    fi
+
+    say "Available: $url (${speed} B/s)"
+    usable_urls+=("$url")
+    if awk "BEGIN {exit !($speed > $best_speed)}"; then
+      best_speed="$speed"
+      best_url="$url"
+    fi
+  done
+
+  if [ -n "$best_url" ]; then
+    say "Selected download source: $best_url (${best_speed} B/s)"
+    if fetch_url "$best_url" "$output" && [ -s "$output" ]; then
+      return 0
+    fi
+    say "Selected source failed, trying remaining available sources."
+  fi
+
+  for url in "${usable_urls[@]}"; do
+    [ "$url" != "$best_url" ] || continue
+    say "Try available fallback: $url"
+    if fetch_url "$url" "$output" && [ -s "$output" ]; then
+      return 0
+    fi
+  done
+
+  say "No probed source completed, trying all sources in order."
+  for url in "$@"; do
+    [ -n "$url" ] || continue
+    say "Try download: $url"
+    if fetch_url "$url" "$output" && [ -s "$output" ]; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 require_pve_host() {
@@ -113,7 +179,7 @@ prompt_choices() {
     echo
     echo "LXC 安装代理："
     echo "  1) 关闭"
-    echo "  2) 自动检测可用代理"
+    echo "  2) 自动检测 PVE/PC/局域网可用代理"
     echo "  3) 手动输入代理地址"
     printf "请选择 [1-3，默认 1]: "
     read -r proxy_choice
@@ -336,17 +402,11 @@ detect_existing_container_network() {
 }
 
 download_with_fallback() {
-  local url="$1" out="$2" u
+  local url="$1" out="$2"
   local urls=()
   [ -n "$GH_PROXY" ] && urls+=("${GH_PROXY%/}/${url}")
   urls+=("$url" "https://gh.llkk.cc/${url}" "https://gh-proxy.com/${url}" "https://mirror.ghproxy.com/${url}")
-  for u in "${urls[@]}"; do
-    say "Try download: $u"
-    if curl -fsSL --connect-timeout 15 --retry 2 -o "$out" "$u"; then
-      return 0
-    fi
-  done
-  return 1
+  download_best_url "$out" "${urls[@]}"
 }
 
 template_path_for_name() {
@@ -529,6 +589,62 @@ start_container() {
   die "Container did not become ready."
 }
 
+PROXY_HINT_LIST=""
+
+append_proxy_hint() {
+  local hint="$1"
+  [ -n "$hint" ] || return 0
+  case "$hint" in
+    *://*) hint="${hint#*://}" ;;
+  esac
+  hint="${hint%%/*}"
+  hint="${hint%%\?*}"
+  hint="${hint##*@}"
+  hint="${hint#[}"
+  hint="${hint%]}"
+  hint="$(printf '%s' "$hint" | tr -d '()[]')"
+  case "$hint" in
+    ''|localhost|127.*|0.0.0.0|::1) return 0 ;;
+  esac
+  case " $PROXY_HINT_LIST " in
+    *" $hint "*) ;;
+    *) PROXY_HINT_LIST="${PROXY_HINT_LIST} ${hint}" ;;
+  esac
+}
+
+detect_proxy_hints() {
+  local token hint
+  PROXY_HINT_LIST=""
+
+  append_proxy_hint "$LXC_PROXY_ADDR"
+  for token in ${PROXY_HINTS:-} ${PVE_PROXY_HINTS:-} ${http_proxy:-} ${https_proxy:-} ${HTTP_PROXY:-} ${HTTPS_PROXY:-}; do
+    append_proxy_hint "$token"
+  done
+
+  if [ -n "${SSH_CLIENT:-}" ]; then
+    append_proxy_hint "$(printf '%s' "$SSH_CLIENT" | awk '{print $1}')"
+  fi
+  if [ -n "${SSH_CONNECTION:-}" ]; then
+    append_proxy_hint "$(printf '%s' "$SSH_CONNECTION" | awk '{print $1}')"
+  fi
+
+  hint="$(who -m 2>/dev/null | awk '{print $NF}' | tr -d '()' || true)"
+  case "$hint" in
+    *.*.*.*|*:*) append_proxy_hint "$hint" ;;
+  esac
+
+  hint="$(last -i -n 1 root 2>/dev/null | awk 'NR == 1 {print $3}' || true)"
+  case "$hint" in
+    *.*.*.*|*:*) append_proxy_hint "$hint" ;;
+  esac
+
+  while read -r hint; do
+    append_proxy_hint "$hint"
+  done < <(ip neigh show 2>/dev/null | awk '$1 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {print $1}' | awk '!seen[$0]++ {print; count++} count >= 30 {exit}' || true)
+
+  printf '%s' "$PROXY_HINT_LIST" | awk '{$1=$1; print}'
+}
+
 setup_lxc_proxy() {
   case "$LXC_PROXY" in
     off|"")
@@ -561,8 +677,13 @@ setup_lxc_proxy() {
 
   local proxy_addr=""
   if [ "$LXC_PROXY" = "auto" ]; then
+    local proxy_hints
+    proxy_hints="$(detect_proxy_hints || true)"
+    [ -n "$proxy_hints" ] && say "LXC proxy auto-detect hints: $proxy_hints"
     proxy_addr="$(pct exec "$CTID" -- env \
       PROXY_ADDR="$LXC_PROXY_ADDR" \
+      PROXY_HINTS="$proxy_hints" \
+      PVE_PROXY_HINTS="$proxy_hints" \
       PROXY_PORT="$LXC_PROXY_PORT" \
       COMMON_PORTS="$LXC_PROXY_COMMON_PORTS" \
       bash /root/lxc-proxy.sh detect 2>/dev/null || true)"

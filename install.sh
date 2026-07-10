@@ -40,6 +40,85 @@ backup_file() {
   fi
 }
 
+fetch_url() {
+  local url="$1" output="$2"
+  if have curl; then
+    curl -fL --connect-timeout 20 --retry 2 -o "$output" "$url"
+  elif have wget; then
+    wget -T 20 -t 2 -O "$output" "$url"
+  else
+    die "curl/wget is missing. Install curl first."
+  fi
+}
+
+probe_download_source() {
+  local url="$1" speed
+  if have curl; then
+    speed="$(curl -fL --range 0-65535 --connect-timeout 8 --max-time 15 -o /dev/null -w '%{speed_download}' "$url" 2>/dev/null || true)"
+  elif have wget; then
+    fetch_url "$url" /dev/null >/dev/null 2>&1 && speed=1 || speed=0
+  else
+    die "curl/wget is missing. Install curl first."
+  fi
+
+  speed="${speed%.*}"
+  case "$speed" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  [ "$speed" -gt 0 ] || return 1
+  printf '%s' "$speed"
+}
+
+download_best_url() {
+  local output="$1" url speed best_url="" best_speed="0"
+  shift
+  local usable_urls=()
+
+  say "Probing download sources"
+  for url in "$@"; do
+    [ -n "$url" ] || continue
+    say "Check: $url"
+    speed="$(probe_download_source "$url" || true)"
+    if [ -z "$speed" ]; then
+      say "Unavailable: $url"
+      continue
+    fi
+
+    say "Available: $url (${speed} B/s)"
+    usable_urls+=("$url")
+    if awk "BEGIN {exit !($speed > $best_speed)}"; then
+      best_speed="$speed"
+      best_url="$url"
+    fi
+  done
+
+  if [ -n "$best_url" ]; then
+    say "Selected download source: $best_url (${best_speed} B/s)"
+    if fetch_url "$best_url" "$output" && [ -s "$output" ]; then
+      return 0
+    fi
+    say "Selected source failed, trying remaining available sources."
+  fi
+
+  for url in "${usable_urls[@]}"; do
+    [ "$url" != "$best_url" ] || continue
+    say "Try available fallback: $url"
+    if fetch_url "$url" "$output" && [ -s "$output" ]; then
+      return 0
+    fi
+  done
+
+  say "No probed source completed, trying all sources in order."
+  for url in "$@"; do
+    [ -n "$url" ] || continue
+    say "Try: $url"
+    if fetch_url "$url" "$output" && [ -s "$output" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 set_yaml_scalar() {
   local file="$1" key="$2" value="$3"
   if grep -q "^${key}:" "$file"; then
@@ -166,45 +245,18 @@ download_file() {
   )
 
   say "Downloading $asset"
-  for url in "${urls[@]}"; do
-    say "Try: $url"
-    if have curl; then
-      if curl -fL --connect-timeout 15 --retry 2 -o "$output" "$url"; then
-        return 0
-      fi
-    elif have wget; then
-      if wget -T 15 -t 2 -O "$output" "$url"; then
-        return 0
-      fi
-    else
-      die "curl/wget is missing. Install curl first."
-    fi
-  done
+  download_best_url "$output" "${urls[@]}" && return 0
   die "Download failed. You can retry with: GH_PROXY=https://your-github-proxy/ bash $0"
 }
 
 download_url_with_fallback() {
-  local url="$1" output="$2" u
+  local url="$1" output="$2"
   local urls=()
 
   [ -n "${GH_PROXY:-}" ] && urls+=("${GH_PROXY%/}/${url}")
   urls+=("$url" "https://gh.llkk.cc/${url}" "https://gh-proxy.com/${url}" "https://mirror.ghproxy.com/${url}")
 
-  for u in "${urls[@]}"; do
-    say "Try: $u"
-    if have curl; then
-      if curl -fL --connect-timeout 20 --retry 2 -o "$output" "$u"; then
-        return 0
-      fi
-    elif have wget; then
-      if wget -T 20 -t 2 -O "$output" "$u"; then
-        return 0
-      fi
-    else
-      die "curl/wget is missing. Install curl first."
-    fi
-  done
-  return 1
+  download_best_url "$output" "${urls[@]}"
 }
 
 resolve_mihomo_version() {
@@ -223,23 +275,28 @@ resolve_mihomo_version() {
       )
 
       say "Resolving latest Mihomo version"
-      for url in "${urls[@]}"; do
-        say "Try: $url"
-        if have curl; then
-          curl -fsSL --connect-timeout 15 --retry 2 -o "$tmp" "$url" || continue
-        elif have wget; then
-          wget -T 15 -t 2 -O "$tmp" "$url" || continue
-        else
-          die "curl/wget is missing. Install curl first."
-        fi
-
+      if download_best_url "$tmp" "${urls[@]}"; then
         latest="$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | head -1)"
         if [ -n "$latest" ]; then
           VERSION="$latest"
           say "Latest Mihomo version: $VERSION"
-          break
         fi
-      done
+      fi
+
+      if [ -z "$latest" ]; then
+        say "Could not parse release metadata from selected source; trying API sources in order."
+        for url in "${urls[@]}"; do
+          [ -n "$url" ] || continue
+          say "Try release API: $url"
+          fetch_url "$url" "$tmp" || continue
+          latest="$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | head -1)"
+          if [ -n "$latest" ]; then
+            VERSION="$latest"
+            say "Latest Mihomo version: $VERSION"
+            break
+          fi
+        done
+      fi
 
       case "$VERSION" in
         latest|auto|current)
@@ -293,21 +350,7 @@ download_nexusbox_installer() {
   )
 
   say "Downloading NexusBox installer"
-  for url in "${urls[@]}"; do
-    [ -n "$url" ] || continue
-    say "Try: $url"
-    if have curl; then
-      if curl -fL --connect-timeout 20 --retry 2 -o "$output" "$url"; then
-        return 0
-      fi
-    elif have wget; then
-      if wget -T 20 -t 2 -O "$output" "$url"; then
-        return 0
-      fi
-    else
-      die "curl/wget is missing. Install curl first."
-    fi
-  done
+  download_best_url "$output" "${urls[@]}" && return 0
   die "NexusBox installer download failed. You can retry with NEXUSBOX_INSTALL_URL=<url>."
 }
 
