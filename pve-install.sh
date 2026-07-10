@@ -13,6 +13,9 @@ RAW_BASE="${RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${BRANCH}}"
 INSTALL_URL="${INSTALL_URL:-${RAW_BASE}/install.sh}"
 PROXY_URL="${PROXY_URL:-${RAW_BASE}/proxy.sh}"
 GH_PROXY="${GH_PROXY:-}"
+PREFER_CN_ACCEL="${PREFER_CN_ACCEL:-0}"
+DOWNLOAD_SPEED_LIMIT="${DOWNLOAD_SPEED_LIMIT:-1024}"
+DOWNLOAD_SPEED_TIME="${DOWNLOAD_SPEED_TIME:-30}"
 
 if [ "${CTID+x}" = "x" ]; then
   CTID_WAS_SET=1
@@ -62,6 +65,13 @@ say() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
 die() { say "ERROR: $*"; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+prefer_cn_accel_enabled() {
+  case "$PREFER_CN_ACCEL" in
+    1|true|yes|on|cn) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 backup_file() {
   local path="$1" ts
   ts="$(date +%Y%m%d-%H%M%S)"
@@ -73,7 +83,7 @@ backup_file() {
 
 fetch_url() {
   local url="$1" output="$2"
-  curl -fL --connect-timeout 20 --retry 2 -o "$output" "$url"
+  curl -fL --connect-timeout 20 --speed-limit "$DOWNLOAD_SPEED_LIMIT" --speed-time "$DOWNLOAD_SPEED_TIME" --retry 2 -o "$output" "$url"
 }
 
 probe_download_source() {
@@ -91,6 +101,18 @@ download_best_url() {
   local output="$1" url speed best_url="" best_speed="0"
   shift
   local usable_urls=()
+
+  if prefer_cn_accel_enabled; then
+    say "Domestic acceleration preferred; trying sources in order"
+    for url in "$@"; do
+      [ -n "$url" ] || continue
+      say "Try preferred source: $url"
+      if fetch_url "$url" "$output" && [ -s "$output" ]; then
+        return 0
+      fi
+    done
+    return 1
+  fi
 
   say "Probing download sources"
   for url in "$@"; do
@@ -469,8 +491,13 @@ detect_existing_container_network() {
 download_with_fallback() {
   local url="$1" out="$2"
   local urls=()
-  [ -n "$GH_PROXY" ] && urls+=("${GH_PROXY%/}/${url}")
-  urls+=("$url" "https://gh.llkk.cc/${url}" "https://gh-proxy.com/${url}" "https://mirror.ghproxy.com/${url}")
+  if prefer_cn_accel_enabled; then
+    [ -n "$GH_PROXY" ] && urls+=("${GH_PROXY%/}/${url}")
+    urls+=("https://gh-proxy.com/${url}" "https://gh.llkk.cc/${url}" "https://mirror.ghproxy.com/${url}" "$url")
+  else
+    [ -n "$GH_PROXY" ] && urls+=("${GH_PROXY%/}/${url}")
+    urls+=("$url" "https://gh.llkk.cc/${url}" "https://gh-proxy.com/${url}" "https://mirror.ghproxy.com/${url}")
+  fi
   download_best_url "$out" "${urls[@]}"
 }
 
@@ -785,7 +812,7 @@ run_in_container() {
   chmod +x "$local_install"
   pct push "$CTID" "$local_install" /root/mihomo-router-install.sh -perms 0755
 
-  local env_args=(MODE="$LXC_INSTALL_MODE" VERSION="$VERSION" NEXUSBOX_INSTALL_URL="$NEXUSBOX_INSTALL_URL" NEXUSBOX_DEFAULT_INSTALL_URL="$NEXUSBOX_DEFAULT_INSTALL_URL" CONFIG_URL="$CONFIG_URL")
+  local env_args=(MODE="$LXC_INSTALL_MODE" VERSION="$VERSION" NEXUSBOX_INSTALL_URL="$NEXUSBOX_INSTALL_URL" NEXUSBOX_DEFAULT_INSTALL_URL="$NEXUSBOX_DEFAULT_INSTALL_URL" CONFIG_URL="$CONFIG_URL" PREFER_CN_ACCEL="$PREFER_CN_ACCEL" GH_PROXY="$GH_PROXY" DOWNLOAD_SPEED_LIMIT="$DOWNLOAD_SPEED_LIMIT" DOWNLOAD_SPEED_TIME="$DOWNLOAD_SPEED_TIME")
   if [ -n "$LXC_PROXY_HTTP" ]; then
     env_args+=(
       http_proxy="$LXC_PROXY_HTTP"

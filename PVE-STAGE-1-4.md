@@ -92,6 +92,7 @@ LXC_PROXY=disable   清理容器内代理配置
 LXC_PROXY_ADDR=IP:端口
 LXC_PROXY_PORT=7897
 LXC_PROXY_COMMON_PORTS="7897 7890 7891 7892 7893 7895 7896 7899 1080 10808 10809 20170 20171"
+PREFER_CN_ACCEL=1  国内入口默认开启，下载脚本、Mihomo、NexusBox 时优先走 GitHub 加速源
 CONFIG_URL=默认使用仓库公开 config.yaml；可设置为自定义 URL；设置 off 可关闭导入
 ```
 

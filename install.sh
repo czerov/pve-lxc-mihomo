@@ -23,6 +23,9 @@ NEXUSBOX_DEFAULT_INSTALL_URL="${NEXUSBOX_DEFAULT_INSTALL_URL:-https://raw.github
 NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-$NEXUSBOX_DEFAULT_INSTALL_URL}"
 MODE="${MODE:-auto}"
 INSTALL_PROFILE="${INSTALL_PROFILE:-unknown}"
+PREFER_CN_ACCEL="${PREFER_CN_ACCEL:-0}"
+DOWNLOAD_SPEED_LIMIT="${DOWNLOAD_SPEED_LIMIT:-1024}"
+DOWNLOAD_SPEED_TIME="${DOWNLOAD_SPEED_TIME:-30}"
 
 mkdir -p "$WORK_DIR"
 exec > >(tee -a "$LOG") 2>&1
@@ -30,6 +33,12 @@ exec > >(tee -a "$LOG") 2>&1
 say() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
 die() { say "ERROR: $*"; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
+prefer_cn_accel_enabled() {
+  case "$PREFER_CN_ACCEL" in
+    1|true|yes|on|cn) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 backup_file() {
   local path="$1"
   local ts
@@ -43,7 +52,7 @@ backup_file() {
 fetch_url() {
   local url="$1" output="$2"
   if have curl; then
-    curl -fL --connect-timeout 20 --retry 2 -o "$output" "$url"
+    curl -fL --connect-timeout 20 --speed-limit "$DOWNLOAD_SPEED_LIMIT" --speed-time "$DOWNLOAD_SPEED_TIME" --retry 2 -o "$output" "$url"
   elif have wget; then
     wget -T 20 -t 2 -O "$output" "$url"
   else
@@ -73,6 +82,18 @@ download_best_url() {
   local output="$1" url speed best_url="" best_speed="0"
   shift
   local usable_urls=()
+
+  if prefer_cn_accel_enabled; then
+    say "Domestic acceleration preferred; trying sources in order"
+    for url in "$@"; do
+      [ -n "$url" ] || continue
+      say "Try preferred source: $url"
+      if fetch_url "$url" "$output" && [ -s "$output" ]; then
+        return 0
+      fi
+    done
+    return 1
+  fi
 
   say "Probing download sources"
   for url in "$@"; do
@@ -237,12 +258,21 @@ download_file() {
     urls+=("${GH_PROXY%/}/${raw_url}")
   fi
 
-  urls+=(
-    "$raw_url"
-    "https://gh.llkk.cc/${raw_url}"
-    "https://gh-proxy.com/${raw_url}"
-    "https://mirror.ghproxy.com/${raw_url}"
-  )
+  if prefer_cn_accel_enabled; then
+    urls+=(
+      "https://gh-proxy.com/${raw_url}"
+      "https://gh.llkk.cc/${raw_url}"
+      "https://mirror.ghproxy.com/${raw_url}"
+      "$raw_url"
+    )
+  else
+    urls+=(
+      "$raw_url"
+      "https://gh.llkk.cc/${raw_url}"
+      "https://gh-proxy.com/${raw_url}"
+      "https://mirror.ghproxy.com/${raw_url}"
+    )
+  fi
 
   say "Downloading $asset"
   download_best_url "$output" "${urls[@]}" && return 0
@@ -254,7 +284,11 @@ download_url_with_fallback() {
   local urls=()
 
   [ -n "${GH_PROXY:-}" ] && urls+=("${GH_PROXY%/}/${url}")
-  urls+=("$url" "https://gh.llkk.cc/${url}" "https://gh-proxy.com/${url}" "https://mirror.ghproxy.com/${url}")
+  if prefer_cn_accel_enabled; then
+    urls+=("https://gh-proxy.com/${url}" "https://gh.llkk.cc/${url}" "https://mirror.ghproxy.com/${url}" "$url")
+  else
+    urls+=("$url" "https://gh.llkk.cc/${url}" "https://gh-proxy.com/${url}" "https://mirror.ghproxy.com/${url}")
+  fi
 
   download_best_url "$output" "${urls[@]}"
 }
@@ -267,12 +301,21 @@ resolve_mihomo_version() {
       local url latest urls=()
 
       [ -n "${GH_PROXY:-}" ] && urls+=("${GH_PROXY%/}/${api}")
-      urls+=(
-        "$api"
-        "https://gh.llkk.cc/${api}"
-        "https://gh-proxy.com/${api}"
-        "https://mirror.ghproxy.com/${api}"
-      )
+      if prefer_cn_accel_enabled; then
+        urls+=(
+          "https://gh-proxy.com/${api}"
+          "https://gh.llkk.cc/${api}"
+          "https://mirror.ghproxy.com/${api}"
+          "$api"
+        )
+      else
+        urls+=(
+          "$api"
+          "https://gh.llkk.cc/${api}"
+          "https://gh-proxy.com/${api}"
+          "https://mirror.ghproxy.com/${api}"
+        )
+      fi
 
       say "Resolving latest Mihomo version"
       if download_best_url "$tmp" "${urls[@]}"; then
@@ -338,16 +381,30 @@ download_nexusbox_installer() {
   local output="$1"
   local url urls=()
 
-  [ -n "${NEXUSBOX_INSTALL_URL:-}" ] && urls+=("$NEXUSBOX_INSTALL_URL")
-  urls+=(
-    "$NEXUSBOX_DEFAULT_INSTALL_URL"
-    "https://cdn.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh"
-    "https://fastly.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh"
-    "https://testingcf.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh"
-    "https://gh.llkk.cc/${NEXUSBOX_DEFAULT_INSTALL_URL}"
-    "https://gh-proxy.com/${NEXUSBOX_DEFAULT_INSTALL_URL}"
-    "https://mirror.ghproxy.com/${NEXUSBOX_DEFAULT_INSTALL_URL}"
-  )
+  if [ -n "${NEXUSBOX_INSTALL_URL:-}" ] && [ "$NEXUSBOX_INSTALL_URL" != "$NEXUSBOX_DEFAULT_INSTALL_URL" ]; then
+    urls+=("$NEXUSBOX_INSTALL_URL")
+  fi
+  if prefer_cn_accel_enabled; then
+    urls+=(
+      "https://gh-proxy.com/${NEXUSBOX_DEFAULT_INSTALL_URL}"
+      "https://gh.llkk.cc/${NEXUSBOX_DEFAULT_INSTALL_URL}"
+      "https://mirror.ghproxy.com/${NEXUSBOX_DEFAULT_INSTALL_URL}"
+      "https://cdn.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh"
+      "https://fastly.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh"
+      "https://testingcf.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh"
+      "$NEXUSBOX_DEFAULT_INSTALL_URL"
+    )
+  else
+    urls+=(
+      "$NEXUSBOX_DEFAULT_INSTALL_URL"
+      "https://cdn.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh"
+      "https://fastly.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh"
+      "https://testingcf.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh"
+      "https://gh.llkk.cc/${NEXUSBOX_DEFAULT_INSTALL_URL}"
+      "https://gh-proxy.com/${NEXUSBOX_DEFAULT_INSTALL_URL}"
+      "https://mirror.ghproxy.com/${NEXUSBOX_DEFAULT_INSTALL_URL}"
+    )
+  fi
 
   say "Downloading NexusBox installer"
   download_best_url "$output" "${urls[@]}" && return 0
