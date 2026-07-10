@@ -40,6 +40,7 @@ LXC_PROXY_COMMON_PORTS="${LXC_PROXY_COMMON_PORTS:-7897 7890 7891 7892 1080 20171
 LXC_PROXY_HTTP=""
 INSTALL_PROFILE="unknown"
 INTERACTIVE="${INTERACTIVE:-auto}"
+NEXUSBOX_DEFAULT_INSTALL_URL="${NEXUSBOX_DEFAULT_INSTALL_URL:-https://raw.githubusercontent.com/Ladavian/NexusBox/main/install.sh}"
 NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-}"
 
 WORK_DIR="${WORK_DIR:-/tmp/pve-mihomo-router}"
@@ -95,10 +96,10 @@ prompt_choices() {
       4)
         LXC_INSTALL_MODE="nexusbox-install"
         if [ -z "$NEXUSBOX_INSTALL_URL" ]; then
-          printf "NexusBox installer URL: "
+          printf "NexusBox installer URL [default: %s]: " "$NEXUSBOX_DEFAULT_INSTALL_URL"
           read -r NEXUSBOX_INSTALL_URL
         fi
-        [ -n "$NEXUSBOX_INSTALL_URL" ] || die "NEXUSBOX_INSTALL_URL is required for NexusBox UI installation."
+        NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-$NEXUSBOX_DEFAULT_INSTALL_URL}"
         ;;
       *) die "Invalid install mode choice: $install_choice" ;;
     esac
@@ -500,7 +501,7 @@ run_in_container() {
   chmod +x "$local_install"
   pct push "$CTID" "$local_install" /root/mihomo-router-install.sh -perms 0755
 
-  local env_args=(MODE="$LXC_INSTALL_MODE" VERSION="$VERSION" NEXUSBOX_INSTALL_URL="$NEXUSBOX_INSTALL_URL")
+  local env_args=(MODE="$LXC_INSTALL_MODE" VERSION="$VERSION" NEXUSBOX_INSTALL_URL="$NEXUSBOX_INSTALL_URL" NEXUSBOX_DEFAULT_INSTALL_URL="$NEXUSBOX_DEFAULT_INSTALL_URL")
   if [ -n "$LXC_PROXY_HTTP" ]; then
     env_args+=(
       http_proxy="$LXC_PROXY_HTTP"

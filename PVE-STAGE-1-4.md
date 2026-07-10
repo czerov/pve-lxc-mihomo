@@ -169,7 +169,7 @@ lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
 - 如果检测到 `/opt/nexusbox/nexusbox`，则修复 NexusBox 的 `/opt/mihomo/mihomo`。
 - 如果没有 NexusBox，则安装纯 Mihomo systemd 服务。
 - 纯 Mihomo 模式不会安装 NexusBox UI，因此不会开放 `18080`。
-- 如果要从零安装 NexusBox UI，使用 `LXC_INSTALL_MODE=nexusbox-install` 并提供 `NEXUSBOX_INSTALL_URL`。
+- 如果要从零安装 NexusBox UI，使用 `LXC_INSTALL_MODE=nexusbox-install`。默认会使用 Ladavian/NexusBox 官方安装脚本，并自动尝试 CDN / GitHub 加速源；需要时也可以自定义 `NEXUSBOX_INSTALL_URL`。
 - 脚本会验证进程、服务、端口、`ip_forward` 和 NAT 规则；验证失败会直接报错，不打印成功。
 
 ## 第 4 阶段：LXC 内防火墙 / NAT 自启

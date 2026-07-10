@@ -29,7 +29,7 @@
 - 纯 Mihomo 旁路由：无 NexusBox UI，无 `18080`
 - 自动模式：已有 NexusBox 就修复核心，否则装纯 Mihomo
 - 修复已有 NexusBox 核心
-- 通过 `NEXUSBOX_INSTALL_URL` 安装 NexusBox UI 后修复核心
+- 从零安装 NexusBox UI 后修复核心，默认使用 Ladavian/NexusBox 官方安装脚本，并自动尝试 CDN / GitHub 加速源
 - LXC 代理：关闭、自动探测、手动输入
 
 如果不想交互，可以加 `INTERACTIVE=0` 并用环境变量指定。
@@ -79,7 +79,7 @@ bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-ins
 CT_ROOTFS_STORAGE=local bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-install-cn.sh)
 ```
 
-安装结束前脚本会复查运行状态：进程、systemd 服务、监听端口、`ip_forward` 和 NAT 规则都通过后才打印成功。新建 LXC 默认是纯 Mihomo 模式，不安装 NexusBox，所以没有 `18080` 页面；`18080` 只在已有 NexusBox 时才会出现。
+安装结束前脚本会复查运行状态：进程、systemd 服务、监听端口、`ip_forward` 和 NAT 规则都通过后才打印成功。新建 LXC 默认是纯 Mihomo 模式，不安装 NexusBox，所以没有 `18080` 页面；选择 NexusBox 安装模式后才会开放 `18080` 页面。
 
 如果容器内下载慢，可以让自动安装流程先配置 LXC 代理，再安装 Mihomo / NexusBox：
 
@@ -182,10 +182,22 @@ bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/
 MODE=auto bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install.sh)
 ```
 
-安装 NexusBox UI 需要提供安装脚本地址：
+从零安装 NexusBox UI：
 
 ```bash
-MODE=nexusbox-install NEXUSBOX_INSTALL_URL=https://example.com/nexusbox-install.sh bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install.sh)
+MODE=nexusbox-install bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install.sh)
+```
+
+默认安装脚本地址是：
+
+```text
+https://raw.githubusercontent.com/Ladavian/NexusBox/main/install.sh
+```
+
+下载失败时会自动尝试 `cdn.jsdelivr.net`、`fastly.jsdelivr.net`、`testingcf.jsdelivr.net` 和 GitHub 加速源。也可以手动指定：
+
+```bash
+MODE=nexusbox-install NEXUSBOX_INSTALL_URL=https://cdn.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install.sh)
 ```
 
 只修复 NexusBox 核心：

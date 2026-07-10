@@ -17,7 +17,8 @@ MIHOMO_BIN="${MIHOMO_BIN:-/usr/local/bin/mihomo}"
 NEXUSBOX_BIN="${NEXUSBOX_BIN:-/opt/nexusbox/nexusbox}"
 NEXUSBOX_CORE="${NEXUSBOX_CORE:-/opt/mihomo/mihomo}"
 NEXUSBOX_CONFIG_DIR="${NEXUSBOX_CONFIG_DIR:-/opt/config}"
-NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-}"
+NEXUSBOX_DEFAULT_INSTALL_URL="${NEXUSBOX_DEFAULT_INSTALL_URL:-https://raw.githubusercontent.com/Ladavian/NexusBox/main/install.sh}"
+NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-$NEXUSBOX_DEFAULT_INSTALL_URL}"
 MODE="${MODE:-auto}"
 INSTALL_PROFILE="${INSTALL_PROFILE:-unknown}"
 
@@ -118,6 +119,40 @@ download_file() {
     fi
   done
   die "Download failed. You can retry with: GH_PROXY=https://your-github-proxy/ bash $0"
+}
+
+download_nexusbox_installer() {
+  local output="$1"
+  local url urls=()
+
+  [ -n "${NEXUSBOX_INSTALL_URL:-}" ] && urls+=("$NEXUSBOX_INSTALL_URL")
+  urls+=(
+    "$NEXUSBOX_DEFAULT_INSTALL_URL"
+    "https://cdn.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh"
+    "https://fastly.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh"
+    "https://testingcf.jsdelivr.net/gh/Ladavian/NexusBox@main/install.sh"
+    "https://gh.llkk.cc/${NEXUSBOX_DEFAULT_INSTALL_URL}"
+    "https://gh-proxy.com/${NEXUSBOX_DEFAULT_INSTALL_URL}"
+    "https://mirror.ghproxy.com/${NEXUSBOX_DEFAULT_INSTALL_URL}"
+  )
+
+  say "Downloading NexusBox installer"
+  for url in "${urls[@]}"; do
+    [ -n "$url" ] || continue
+    say "Try: $url"
+    if have curl; then
+      if curl -fL --connect-timeout 20 --retry 2 -o "$output" "$url"; then
+        return 0
+      fi
+    elif have wget; then
+      if wget -T 20 -t 2 -O "$output" "$url"; then
+        return 0
+      fi
+    else
+      die "curl/wget is missing. Install curl first."
+    fi
+  done
+  die "NexusBox installer download failed. You can retry with NEXUSBOX_INSTALL_URL=<url>."
 }
 
 apt_install_if_missing() {
@@ -312,18 +347,12 @@ fix_nexusbox_core() {
 
 install_nexusbox_from_url() {
   say "Mode: install NexusBox UI, then fix Mihomo core"
-  [ -n "$NEXUSBOX_INSTALL_URL" ] || die "NEXUSBOX_INSTALL_URL is required for MODE=nexusbox-install."
   apt_install_if_missing ca-certificates curl gzip iproute2 iptables procps
 
   local nexusbox_installer="$WORK_DIR/nexusbox-install.sh"
-  say "Downloading NexusBox installer: $NEXUSBOX_INSTALL_URL"
-  if have curl; then
-    curl -fL --connect-timeout 20 --retry 2 -o "$nexusbox_installer" "$NEXUSBOX_INSTALL_URL"
-  else
-    wget -T 20 -t 2 -O "$nexusbox_installer" "$NEXUSBOX_INSTALL_URL"
-  fi
+  download_nexusbox_installer "$nexusbox_installer"
   chmod 0755 "$nexusbox_installer"
-  bash "$nexusbox_installer"
+  printf '\n' | bash "$nexusbox_installer"
 
   [ -x "$NEXUSBOX_BIN" ] || die "NexusBox installer finished, but $NEXUSBOX_BIN was not found."
   fix_nexusbox_core
