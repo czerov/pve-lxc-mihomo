@@ -323,6 +323,22 @@ restart_nexusbox() {
   sleep 3
 }
 
+stop_nexusbox_for_core_replace() {
+  say "Stopping NexusBox before replacing Mihomo core"
+  if have systemctl && systemctl list-unit-files | grep -q '^nexusbox\.service'; then
+    systemctl stop nexusbox || true
+  fi
+  pkill -f '^/opt/nexusbox/nexusbox$' 2>/dev/null || true
+  pkill -f "${NEXUSBOX_CORE} -d ${NEXUSBOX_CONFIG_DIR}" 2>/dev/null || true
+  for _ in $(seq 1 10); do
+    if ! pgrep -f "${NEXUSBOX_CORE}" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  say "Mihomo core process is still present; trying to replace anyway."
+}
+
 fix_nexusbox_core() {
   say "Mode: NexusBox core auto-fix"
   INSTALL_PROFILE="nexusbox"
@@ -331,6 +347,7 @@ fix_nexusbox_core() {
   prepare_core_binary
 
   mkdir -p "$(dirname "$NEXUSBOX_CORE")" /opt/nexusbox/var
+  stop_nexusbox_for_core_replace
   backup_file "$NEXUSBOX_CORE"
   cp "$WORK_DIR/mihomo" "$NEXUSBOX_CORE"
   chmod 0755 "$NEXUSBOX_CORE"
