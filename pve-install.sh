@@ -879,6 +879,7 @@ detect_dns_port() {
 }
 
 check_dns_runtime() {
+  local config_file dns_port
   config_file="$1"
   dns_port="$(detect_dns_port "$config_file" || true)"
   if [ -z "$dns_port" ]; then
@@ -896,14 +897,49 @@ check_dns_runtime() {
   fi
 }
 
+detect_redir_port() {
+  local config_file
+  config_file="$1"
+  [ -f "$config_file" ] || return 0
+  awk '
+    /^[[:space:]]*redir-port:[[:space:]]*/ {
+      value=$0
+      sub(/^[[:space:]]*redir-port:[[:space:]]*/, "", value)
+      sub(/[[:space:]]*#.*/, "", value)
+      gsub(/["'\'' ]/, "", value)
+      if (value ~ /^[0-9]+$/) print value
+      exit
+    }
+  ' "$config_file"
+}
+
+check_transparent_runtime() {
+  local config_file redir_port
+  config_file="$1"
+  redir_port="$(detect_redir_port "$config_file" || true)"
+  if [ -z "$redir_port" ]; then
+    echo "warn: redir-port not found in ${config_file}"
+    return 0
+  fi
+  check_port "$redir_port" "Mihomo transparent redirect"
+  if iptables -t nat -S PREROUTING 2>/dev/null | grep -q -- '-j MIHOMO_REDIRECT' && iptables -t nat -S MIHOMO_REDIRECT 2>/dev/null | grep -Eq -- "--to-ports ${redir_port}"; then
+    echo "ok: Transparent TCP redirect -> ${redir_port}"
+  else
+    echo "fail: Transparent TCP redirect -> ${redir_port}"
+    fail=1
+  fi
+}
+
 if [ "$profile" = "nexusbox" ]; then
   check_cmd "NexusBox process" pgrep -f /opt/nexusbox/nexusbox
   check_port 18080 "NexusBox UI"
   check_dns_runtime /opt/config/config.yaml
+  check_transparent_runtime /opt/config/config.yaml
 else
   check_cmd "mihomo.service active" systemctl is-active --quiet mihomo
   check_cmd "Mihomo process" pgrep -f "/usr/local/bin/mihomo -d /etc/mihomo"
   check_dns_runtime /etc/mihomo/config.yaml
+  check_transparent_runtime /etc/mihomo/config.yaml
 fi
 
 check_port 7890 "Mihomo mixed proxy"
@@ -951,7 +987,8 @@ print_summary() {
   [ -n "$LXC_PROXY_HTTP" ] && echo "LXC proxy used during install: $LXC_PROXY_HTTP"
   echo
   echo "Stage 5 still needs router settings:"
-  echo "  route: 198.18.0.0/16 -> ${ip}"
+  echo "  option A: set client gateway to ${ip}"
+  echo "  option B: keep current gateway, set client DNS to ${ip}, and add route 28.0.0.0/8 -> ${ip}"
   echo "  client DNS: ${ip}"
   echo
   echo "Log file: $LOG"

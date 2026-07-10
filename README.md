@@ -293,15 +293,17 @@ GH_PROXY=https://gh.llkk.cc bash <(curl -fsSL https://raw.githubusercontent.com/
 
 ## 安装后主路由配置
 
-在主路由添加静态路由：
+方式 A：把终端设备或主路由的网关/DNS 指向 LXC 容器 IP，例如 `192.168.1.9`。脚本会在 LXC 内配置 TCP 透明代理、DNS 转发和 NAT。
+
+方式 B：保留原网关，只把终端设备 DNS 填 LXC 容器 IP，并在主路由添加 fake-ip 静态路由：
 
 ```text
-目的网络：198.18.0.0
-子网掩码：255.255.0.0
+目的网络：28.0.0.0
+子网掩码：255.0.0.0
 下一跳/网关：LXC 容器 IP，例如 192.168.1.9
 ```
 
-终端设备 DNS 填 LXC 容器 IP，例如：
+终端设备 DNS：
 
 ```text
 192.168.1.9

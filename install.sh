@@ -200,6 +200,23 @@ detect_dns_listen_port() {
   ' "$file"
 }
 
+detect_redir_port() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+  awk '
+    /^[[:space:]]*redir-port:[[:space:]]*/ {
+      value=$0
+      sub(/^[[:space:]]*redir-port:[[:space:]]*/, "", value)
+      sub(/[[:space:]]*#.*/, "", value)
+      gsub(/["'\'' ]/, "", value)
+      if (value ~ /^[0-9]+$/) {
+        print value
+      }
+      exit
+    }
+  ' "$file"
+}
+
 require_root() {
   [ "$(id -u)" = "0" ] || die "Please run as root."
 }
@@ -478,7 +495,7 @@ prepare_core_binary() {
 }
 
 write_rc_local_nat() {
-  local iface="$1" dns_port="${2:-}"
+  local iface="$1" dns_port="${2:-}" redir_port="${3:-}"
   say "Configure rc.local NAT on interface: $iface"
   backup_file /etc/rc.local
   cat > /etc/rc.local <<EOF
@@ -488,6 +505,15 @@ iptables -t nat -C POSTROUTING -o ${iface} -j MASQUERADE 2>/dev/null || iptables
 if [ -n "${dns_port}" ] && [ "${dns_port}" != "53" ]; then
   iptables -t nat -C PREROUTING -p udp --dport 53 -j REDIRECT --to-ports ${dns_port} 2>/dev/null || iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports ${dns_port}
   iptables -t nat -C PREROUTING -p tcp --dport 53 -j REDIRECT --to-ports ${dns_port} 2>/dev/null || iptables -t nat -A PREROUTING -p tcp --dport 53 -j REDIRECT --to-ports ${dns_port}
+fi
+if [ -n "${redir_port}" ]; then
+  iptables -t nat -N MIHOMO_REDIRECT 2>/dev/null || true
+  iptables -t nat -F MIHOMO_REDIRECT
+  for cidr in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4; do
+    iptables -t nat -A MIHOMO_REDIRECT -d \$cidr -j RETURN
+  done
+  iptables -t nat -A MIHOMO_REDIRECT -p tcp -j REDIRECT --to-ports ${redir_port}
+  iptables -t nat -C PREROUTING -p tcp -j MIHOMO_REDIRECT 2>/dev/null || iptables -t nat -A PREROUTING -p tcp -j MIHOMO_REDIRECT
 fi
 exit 0
 EOF
@@ -527,6 +553,20 @@ verify_dns_runtime() {
   fi
 }
 
+verify_transparent_runtime() {
+  local config_file="$1" redir_port
+  redir_port="$(detect_redir_port "$config_file" || true)"
+  [ -n "$redir_port" ] || {
+    say "No redir-port found in $config_file; skip transparent proxy verification"
+    return 0
+  }
+
+  wait_for_port "$redir_port" "Mihomo transparent redirect"
+  iptables -t nat -S PREROUTING 2>/dev/null | grep -q -- "-j MIHOMO_REDIRECT" || die "Transparent TCP redirect rule is missing."
+  iptables -t nat -S MIHOMO_REDIRECT 2>/dev/null | grep -Eq -- "--to-ports ${redir_port}" || die "Transparent TCP redirect target ${redir_port} is missing."
+  say "Verified transparent TCP redirect: PREROUTING -> ${redir_port}"
+}
+
 verify_standalone_running() {
   say "Verifying standalone Mihomo runtime"
   if have systemctl; then
@@ -539,6 +579,7 @@ verify_standalone_running() {
   wait_for_port 7890 "Mihomo mixed proxy"
   wait_for_port 9090 "Mihomo controller API"
   verify_dns_runtime "$CONFIG_FILE"
+  verify_transparent_runtime "$CONFIG_FILE"
 }
 
 verify_nexusbox_running() {
@@ -548,6 +589,7 @@ verify_nexusbox_running() {
   wait_for_port 7890 "Mihomo mixed proxy"
   wait_for_port 9090 "Mihomo controller API"
   verify_dns_runtime "${NEXUSBOX_CONFIG_DIR}/config.yaml"
+  verify_transparent_runtime "${NEXUSBOX_CONFIG_DIR}/config.yaml"
 }
 
 install_standalone_mihomo() {
@@ -620,7 +662,7 @@ EOF
 
   systemctl daemon-reload
   systemctl enable --now mihomo
-  write_rc_local_nat "$(detect_egress_iface)" "$(detect_dns_listen_port "$CONFIG_FILE" || true)"
+  write_rc_local_nat "$(detect_egress_iface)" "$(detect_dns_listen_port "$CONFIG_FILE" || true)" "$(detect_redir_port "$CONFIG_FILE" || true)"
   verify_standalone_running
 }
 
@@ -669,7 +711,7 @@ fix_nexusbox_core() {
   "$NEXUSBOX_CORE" -v
   "$NEXUSBOX_CORE" -t -d "$NEXUSBOX_CONFIG_DIR"
 
-  write_rc_local_nat "$(detect_egress_iface)" "$(detect_dns_listen_port "${NEXUSBOX_CONFIG_DIR}/config.yaml" || true)"
+  write_rc_local_nat "$(detect_egress_iface)" "$(detect_dns_listen_port "${NEXUSBOX_CONFIG_DIR}/config.yaml" || true)" "$(detect_redir_port "${NEXUSBOX_CONFIG_DIR}/config.yaml" || true)"
   restart_nexusbox
 
   curl -fsS "http://127.0.0.1:18080/configs?force=true" || true

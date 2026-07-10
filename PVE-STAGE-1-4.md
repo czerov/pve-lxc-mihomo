@@ -201,6 +201,11 @@ echo 1 >/proc/sys/net/ipv4/ip_forward
 #!/bin/sh -e
 echo 1 >/proc/sys/net/ipv4/ip_forward
 iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+iptables -t nat -N MIHOMO_REDIRECT 2>/dev/null || true
+iptables -t nat -F MIHOMO_REDIRECT
+iptables -t nat -A MIHOMO_REDIRECT -d 192.168.0.0/16 -j RETURN
+iptables -t nat -A MIHOMO_REDIRECT -p tcp -j REDIRECT --to-ports 7877
+iptables -t nat -C PREROUTING -p tcp -j MIHOMO_REDIRECT 2>/dev/null || iptables -t nat -A PREROUTING -p tcp -j MIHOMO_REDIRECT
 exit 0
 ```
 
@@ -211,8 +216,8 @@ exit 0
 第 5 阶段仍需要根据主路由型号处理。脚本结束时会提示：
 
 ```text
-route: 198.18.0.0/16 -> LXC_IP
-client DNS: LXC_IP
+方式 A：client gateway/DNS -> LXC_IP
+方式 B：client DNS -> LXC_IP，并添加 route 28.0.0.0/8 -> LXC_IP
 ```
 
 如果主路由是 OpenWrt/iStoreOS/ImmortalWrt，后续可以继续加 `router-openwrt.sh` 做自动配置。
