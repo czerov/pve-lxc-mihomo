@@ -264,6 +264,19 @@ download_nexusbox_installer() {
   die "NexusBox installer download failed. You can retry with NEXUSBOX_INSTALL_URL=<url>."
 }
 
+patch_nexusbox_installer() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+
+  if grep -q '^ install_mihomo$' "$file"; then
+    sed -i '/^ install_mihomo$/c\ msg "Skip NexusBox bundled Mihomo download; pve-lxc-mihomo will install a CPU-matched core next."' "$file"
+  fi
+
+  if grep -q '是否立即启动 NexusBox' "$file"; then
+    sed -i 's/read -rp "是否立即启动 NexusBox？\[Y\/n\] " START/START="${NEXUSBOX_AUTO_START:-Y}"/' "$file"
+  fi
+}
+
 apt_install_if_missing() {
   local pkgs=()
   for p in "$@"; do
@@ -500,6 +513,7 @@ install_nexusbox_from_url() {
 
   local nexusbox_installer="$WORK_DIR/nexusbox-install.sh"
   download_nexusbox_installer "$nexusbox_installer"
+  patch_nexusbox_installer "$nexusbox_installer"
   chmod 0755 "$nexusbox_installer"
   printf '\n' | bash "$nexusbox_installer"
 
