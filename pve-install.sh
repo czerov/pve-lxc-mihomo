@@ -28,6 +28,7 @@ CT_SWAP="${CT_SWAP:-0}"
 CT_DISK_SIZE="${CT_DISK_SIZE:-8}"
 CT_ROOTFS_STORAGE="${CT_ROOTFS_STORAGE:-}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
+CT_TEMPLATE_NAME="${CT_TEMPLATE_NAME:-debian-13-standard_13.1-2_amd64.tar.zst}"
 TEMPLATE_URL="${TEMPLATE_URL:-}"
 CT_PASSWORD="${CT_PASSWORD:-}"
 CT_DNS="${CT_DNS:-223.5.5.5}"
@@ -368,7 +369,26 @@ choose_template() {
     return 0
   fi
 
-  existing="$(pveam list "$CT_TEMPLATE_STORAGE" 2>/dev/null | awk '/debian-12-standard.*amd64.*(tar.zst|tar.gz)/{print $1}' | sort -V | tail -1 || true)"
+  if [ -n "$CT_TEMPLATE_NAME" ]; then
+    existing="$(pveam list "$CT_TEMPLATE_STORAGE" 2>/dev/null | awk -v name="$CT_TEMPLATE_NAME" '$1 == name || $1 == "vztmpl/" name || $1 ~ ("/" name "$") {print $1; exit}' || true)"
+    if [ -z "$existing" ]; then
+      local template_path
+      template_path="$(pvesm path "${CT_TEMPLATE_STORAGE}:vztmpl/${CT_TEMPLATE_NAME}" 2>/dev/null || true)"
+      if [ -n "$template_path" ] && [ -s "$template_path" ]; then
+        existing="${CT_TEMPLATE_STORAGE}:vztmpl/${CT_TEMPLATE_NAME}"
+      elif [ -s "/var/lib/vz/template/cache/${CT_TEMPLATE_NAME}" ]; then
+        existing="${CT_TEMPLATE_STORAGE}:vztmpl/${CT_TEMPLATE_NAME}"
+      fi
+    fi
+    if [ -n "$existing" ]; then
+      TEMPLATE="$existing"
+      say "Use preferred template: $TEMPLATE"
+      return 0
+    fi
+    say "Preferred template was not found locally: $CT_TEMPLATE_NAME"
+  fi
+
+  existing="$(pveam list "$CT_TEMPLATE_STORAGE" 2>/dev/null | awk '/debian-13-standard.*amd64.*(tar.zst|tar.gz)/{print $1}' | sort -V | tail -1 || true)"
   if [ -n "$existing" ]; then
     TEMPLATE="$existing"
     say "Use existing template: $TEMPLATE"
@@ -377,8 +397,11 @@ choose_template() {
 
   say "Updating LXC template list"
   pveam update
-  latest="$(pveam available --section system | awk '/debian-12-standard.*amd64.*(tar.zst|tar.gz)/{print $2}' | sort -V | tail -1 || true)"
-  [ -n "$latest" ] || die "Cannot find Debian 12 amd64 LXC template."
+  latest="$(pveam available --section system | awk '/debian-13-standard.*amd64.*(tar.zst|tar.gz)/{print $2}' | sort -V | tail -1 || true)"
+  if [ -z "$latest" ]; then
+    latest="$(pveam available --section system | awk '/debian-12-standard.*amd64.*(tar.zst|tar.gz)/{print $2}' | sort -V | tail -1 || true)"
+  fi
+  [ -n "$latest" ] || die "Cannot find Debian 13/12 amd64 LXC template."
   say "Downloading template: $latest"
   pveam download "$CT_TEMPLATE_STORAGE" "$latest"
   TEMPLATE="${CT_TEMPLATE_STORAGE}:vztmpl/${latest}"

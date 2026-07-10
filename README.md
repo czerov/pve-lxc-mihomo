@@ -73,6 +73,18 @@ TEMPLATE_URL=https://mirrors.tuna.tsinghua.edu.cn/proxmox/images/system/debian-1
 bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-install-cn.sh)
 ```
 
+默认新建 LXC 会优先使用本地模板：
+
+```text
+debian-13-standard_13.1-2_amd64.tar.zst
+```
+
+如果要指定其他本地模板，可以设置：
+
+```bash
+CT_TEMPLATE_NAME=debian-12-standard_12.12-1_amd64.tar.zst bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-install-cn.sh)
+```
+
 脚本会自动选择 LXC 根磁盘存储：优先 `local-lvm`，不存在时使用 `local`。也可以手动指定：
 
 ```bash
