@@ -213,7 +213,7 @@ detect_egress_iface() {
 
 cpu_supports_amd64_v3() {
   [ "$(uname -m)" = "x86_64" ] || return 1
-  local flags missing=0
+  local flags missing=0 f
   flags="$(awk -F: '/flags/{print " " $2 " "; exit}' /proc/cpuinfo 2>/dev/null || true)"
   for f in avx avx2 bmi1 bmi2 f16c fma lzcnt movbe osxsave; do
     case "$flags" in
@@ -224,20 +224,41 @@ cpu_supports_amd64_v3() {
   [ "$missing" = "0" ]
 }
 
+missing_amd64_v3_flags() {
+  local flags missing="" f
+  flags="$(awk -F: '/flags/{print " " $2 " "; exit}' /proc/cpuinfo 2>/dev/null || true)"
+  for f in avx avx2 bmi1 bmi2 f16c fma lzcnt movbe osxsave; do
+    case "$flags" in
+      *" $f "*) ;;
+      *) missing="${missing}${missing:+ }${f}" ;;
+    esac
+  done
+  printf '%s' "$missing"
+}
+
 choose_asset() {
-  local arch
+  local arch missing_flags
   arch="$(uname -m)"
+  say "CPU detection: arch=$arch"
   case "$arch" in
     x86_64)
       if cpu_supports_amd64_v3; then
+        say "CPU amd64-v3 support: yes"
         CORE_KIND="amd64-v3"
         ASSET="mihomo-linux-amd64-v3-${VERSION}.gz"
       else
+        missing_flags="$(missing_amd64_v3_flags)"
+        if [ -n "$missing_flags" ]; then
+          say "CPU amd64-v3 support: no; missing flags: $missing_flags"
+        else
+          say "CPU amd64-v3 support: no"
+        fi
         CORE_KIND="amd64-compatible"
         ASSET="mihomo-linux-amd64-compatible-${VERSION}.gz"
       fi
       ;;
     aarch64|arm64)
+      say "CPU amd64-v3 support: not applicable for $arch"
       CORE_KIND="arm64"
       ASSET="mihomo-linux-arm64-${VERSION}.gz"
       ;;

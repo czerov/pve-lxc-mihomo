@@ -174,7 +174,7 @@ lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
 容器内脚本会：
 
 - 自动检测 CPU 架构。
-- 自动检测是否支持 `amd64-v3`。
+- 自动检测是否支持 `amd64-v3`，并在日志里打印架构、支持结果和缺失的 CPU flags。
 - 支持则安装 `mihomo-linux-amd64-v3`。
 - 不支持则安装 `mihomo-linux-amd64-compatible`。
 - 如果检测到 `/opt/nexusbox/nexusbox`，则修复 NexusBox 的 `/opt/mihomo/mihomo`。
