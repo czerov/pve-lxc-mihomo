@@ -86,12 +86,12 @@ prompt_choices() {
 
   if [ "$LXC_INSTALL_MODE" = "auto" ] && [ -z "$NEXUSBOX_INSTALL_URL" ]; then
     echo
-    echo "Install mode:"
-    echo "  1) Standalone Mihomo side-router (no NexusBox UI / no 18080)"
-    echo "  2) Auto: fix NexusBox if already installed, otherwise standalone Mihomo"
-    echo "  3) Fix existing NexusBox core only"
-    echo "  4) Install NexusBox UI from installer URL, then fix core"
-    printf "Choose [1-4, default 1]: "
+    echo "安装模式："
+    echo "  1) 纯 Mihomo 旁路由（不安装 NexusBox UI / 不开放 18080）"
+    echo "  2) 自动判断：已有 NexusBox 就修复核心，否则安装纯 Mihomo"
+    echo "  3) 只修复已有 NexusBox 的 Mihomo 核心"
+    echo "  4) 新建/准备 LXC 后，从安装脚本安装 NexusBox UI，再自动安装适配的 Mihomo 核心"
+    printf "请选择 [1-4，默认 1]: "
     read -r install_choice
     case "${install_choice:-1}" in
       1) LXC_INSTALL_MODE="standalone" ;;
@@ -100,38 +100,38 @@ prompt_choices() {
       4)
         LXC_INSTALL_MODE="nexusbox-install"
         if [ -z "$NEXUSBOX_INSTALL_URL" ]; then
-          printf "NexusBox installer URL [default: %s]: " "$NEXUSBOX_DEFAULT_INSTALL_URL"
+          printf "NexusBox 安装脚本地址 [默认: %s]: " "$NEXUSBOX_DEFAULT_INSTALL_URL"
           read -r NEXUSBOX_INSTALL_URL
         fi
         NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-$NEXUSBOX_DEFAULT_INSTALL_URL}"
         ;;
-      *) die "Invalid install mode choice: $install_choice" ;;
+      *) die "无效安装模式选择: $install_choice" ;;
     esac
   fi
 
   if [ "$LXC_PROXY" = "off" ]; then
     echo
-    echo "LXC proxy:"
-    echo "  1) Off"
-    echo "  2) Auto-detect online proxy"
-    echo "  3) Manually enter proxy address"
-    printf "Choose [1-3, default 1]: "
+    echo "LXC 安装代理："
+    echo "  1) 关闭"
+    echo "  2) 自动检测可用代理"
+    echo "  3) 手动输入代理地址"
+    printf "请选择 [1-3，默认 1]: "
     read -r proxy_choice
     case "${proxy_choice:-1}" in
       1) LXC_PROXY="off" ;;
       2) LXC_PROXY="auto" ;;
       3)
         LXC_PROXY="on"
-        printf "Proxy address, for example 192.168.1.100:7897: "
+        printf "代理地址，例如 192.168.1.100:7897: "
         read -r LXC_PROXY_ADDR
-        [ -n "$LXC_PROXY_ADDR" ] || die "LXC_PROXY_ADDR is required for manual proxy mode."
+        [ -n "$LXC_PROXY_ADDR" ] || die "手动代理模式必须填写 LXC_PROXY_ADDR。"
         ;;
-      *) die "Invalid proxy choice: $proxy_choice" ;;
+      *) die "无效代理选择: $proxy_choice" ;;
     esac
   fi
 
-  say "Selected install mode: $LXC_INSTALL_MODE"
-  say "Selected LXC proxy mode: $LXC_PROXY"
+  say "已选择安装模式: $LXC_INSTALL_MODE"
+  say "已选择 LXC 代理模式: $LXC_PROXY"
 }
 
 detect_storage() {
