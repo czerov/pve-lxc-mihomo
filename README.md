@@ -110,6 +110,8 @@ CT_ROOTFS_STORAGE=local bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve
 
 如果导入的配置里 `dns.listen` 不是标准 `53` 端口，例如公开默认配置使用 `0.0.0.0:6666`，脚本会自动在 LXC 内持久化 DNS 转发，把客户端访问的 `53/tcp` 和 `53/udp` 转到实际 DNS 端口，并在健康检查里验证这条规则。
 
+无代理也可以尝试一键安装。脚本会优先使用当前网络能访问的 GitHub / CDN / 加速源；国内网络建议从 `pve-install-cn.sh` 启动。若本地网络无法访问 GitHub、jsDelivr 或几个 GitHub 加速源，安装仍可能失败，此时再使用 `LXC_PROXY=auto` 或手动指定代理。
+
 如果容器内下载慢，可以让自动安装流程先配置 LXC 代理，再安装 Mihomo / NexusBox：
 
 ```bash
@@ -261,13 +263,15 @@ MODE=standalone bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-l
 
 ## 指定版本
 
-默认版本：
+默认会自动解析 MetaCubeX Mihomo 最新 release，并按 CPU 自动选择 `amd64-v3` / `amd64-compatible` / `arm64` 核心。如果 GitHub API 和加速源都不可用，会退回到脚本内置的稳定兜底版本。
+
+默认版本策略：
 
 ```text
-v1.19.28
+latest，兜底 v1.19.28
 ```
 
-指定版本：
+如果要固定版本：
 
 ```bash
 VERSION=v1.19.28 bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install.sh)

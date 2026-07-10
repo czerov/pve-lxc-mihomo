@@ -7,8 +7,9 @@ set -Eeuo pipefail
 # - Existing files are copied to timestamped backups before overwrite.
 # - CPU is detected automatically: amd64-v3 core when supported, compatible core otherwise.
 
-VERSION="${VERSION:-v1.19.28}"
-BASE_URL="${BASE_URL:-https://github.com/MetaCubeX/mihomo/releases/download/${VERSION}}"
+VERSION="${VERSION:-latest}"
+MIHOMO_FALLBACK_VERSION="${MIHOMO_FALLBACK_VERSION:-v1.19.28}"
+BASE_URL="${BASE_URL:-}"
 WORK_DIR="${WORK_DIR:-/tmp/mihomo-router-install}"
 LOG="${LOG:-/root/mihomo-router-install.log}"
 CONFIG_DIR="${CONFIG_DIR:-/etc/mihomo}"
@@ -206,6 +207,52 @@ download_url_with_fallback() {
   return 1
 }
 
+resolve_mihomo_version() {
+  case "$VERSION" in
+    latest|auto|current)
+      local api="https://api.github.com/repos/MetaCubeX/mihomo/releases/latest"
+      local tmp="$WORK_DIR/mihomo-latest.json"
+      local url latest urls=()
+
+      [ -n "${GH_PROXY:-}" ] && urls+=("${GH_PROXY%/}/${api}")
+      urls+=(
+        "$api"
+        "https://gh.llkk.cc/${api}"
+        "https://gh-proxy.com/${api}"
+        "https://mirror.ghproxy.com/${api}"
+      )
+
+      say "Resolving latest Mihomo version"
+      for url in "${urls[@]}"; do
+        say "Try: $url"
+        if have curl; then
+          curl -fsSL --connect-timeout 15 --retry 2 -o "$tmp" "$url" || continue
+        elif have wget; then
+          wget -T 15 -t 2 -O "$tmp" "$url" || continue
+        else
+          die "curl/wget is missing. Install curl first."
+        fi
+
+        latest="$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | head -1)"
+        if [ -n "$latest" ]; then
+          VERSION="$latest"
+          say "Latest Mihomo version: $VERSION"
+          break
+        fi
+      done
+
+      case "$VERSION" in
+        latest|auto|current)
+          VERSION="$MIHOMO_FALLBACK_VERSION"
+          say "Could not resolve latest Mihomo version; fallback to $VERSION"
+          ;;
+      esac
+      ;;
+  esac
+
+  [ -n "$BASE_URL" ] || BASE_URL="https://github.com/MetaCubeX/mihomo/releases/download/${VERSION}"
+}
+
 import_config_from_url() {
   local target="$1" profile="$2"
   [ -n "$CONFIG_URL" ] || return 0
@@ -300,6 +347,7 @@ apt_install_if_missing() {
 }
 
 prepare_core_binary() {
+  resolve_mihomo_version
   choose_asset
   mkdir -p "$WORK_DIR"
   download_file "$ASSET" "$WORK_DIR/mihomo.gz"
