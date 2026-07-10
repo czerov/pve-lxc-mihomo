@@ -114,6 +114,16 @@ CT_ROOTFS_STORAGE=local bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve
 LXC_PROXY=auto bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
 ```
 
+如果要自动导入自己的规则配置，可以传入 `CONFIG_URL`。脚本会下载配置、备份旧配置、补齐 NexusBox 必需的控制端口配置、测试配置并重启服务：
+
+```bash
+CONFIG_URL=https://example.com/config.yaml \
+LXC_INSTALL_MODE=nexusbox-install \
+bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-install-cn.sh)
+```
+
+不要把包含私人订阅、节点或密钥的 `config.yaml` 直接提交到公开仓库。
+
 `auto` 只会在容器内探测到在线代理时启用。也可以强制指定代理：
 
 ```bash

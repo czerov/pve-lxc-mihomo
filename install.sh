@@ -13,6 +13,7 @@ WORK_DIR="${WORK_DIR:-/tmp/mihomo-router-install}"
 LOG="${LOG:-/root/mihomo-router-install.log}"
 CONFIG_DIR="${CONFIG_DIR:-/etc/mihomo}"
 CONFIG_FILE="${CONFIG_FILE:-${CONFIG_DIR}/config.yaml}"
+CONFIG_URL="${CONFIG_URL:-}"
 MIHOMO_BIN="${MIHOMO_BIN:-/usr/local/bin/mihomo}"
 NEXUSBOX_BIN="${NEXUSBOX_BIN:-/opt/nexusbox/nexusbox}"
 NEXUSBOX_CORE="${NEXUSBOX_CORE:-/opt/mihomo/mihomo}"
@@ -35,6 +36,15 @@ backup_file() {
   if [ -e "$path" ]; then
     cp -a "$path" "${path}.bak-${ts}"
     say "Backed up $path -> ${path}.bak-${ts}"
+  fi
+}
+
+set_yaml_scalar() {
+  local file="$1" key="$2" value="$3"
+  if grep -q "^${key}:" "$file"; then
+    sed -i "s|^${key}:.*|${key}: ${value}|" "$file"
+  else
+    printf '\n%s: %s\n' "$key" "$value" >> "$file"
   fi
 }
 
@@ -119,6 +129,52 @@ download_file() {
     fi
   done
   die "Download failed. You can retry with: GH_PROXY=https://your-github-proxy/ bash $0"
+}
+
+download_url_with_fallback() {
+  local url="$1" output="$2" u
+  local urls=()
+
+  [ -n "${GH_PROXY:-}" ] && urls+=("${GH_PROXY%/}/${url}")
+  urls+=("$url" "https://gh.llkk.cc/${url}" "https://gh-proxy.com/${url}" "https://mirror.ghproxy.com/${url}")
+
+  for u in "${urls[@]}"; do
+    say "Try: $u"
+    if have curl; then
+      if curl -fL --connect-timeout 20 --retry 2 -o "$output" "$u"; then
+        return 0
+      fi
+    elif have wget; then
+      if wget -T 20 -t 2 -O "$output" "$u"; then
+        return 0
+      fi
+    else
+      die "curl/wget is missing. Install curl first."
+    fi
+  done
+  return 1
+}
+
+import_config_from_url() {
+  local target="$1" profile="$2"
+  [ -n "$CONFIG_URL" ] || return 0
+
+  local downloaded="$WORK_DIR/config.yaml"
+  say "Importing custom config for $profile"
+  download_url_with_fallback "$CONFIG_URL" "$downloaded" || die "Failed to download CONFIG_URL."
+  [ -s "$downloaded" ] || die "Downloaded CONFIG_URL is empty."
+
+  mkdir -p "$(dirname "$target")"
+  backup_file "$target"
+  cp "$downloaded" "$target"
+
+  set_yaml_scalar "$target" "mixed-port" "7890"
+  set_yaml_scalar "$target" "allow-lan" "true"
+  set_yaml_scalar "$target" "external-controller" "'0.0.0.0:9090'"
+  if [ "$profile" = "nexusbox" ]; then
+    set_yaml_scalar "$target" "external-controller-unix" "'/opt/nexusbox/var/core.sock'"
+    set_yaml_scalar "$target" "external-ui" "ui/meta"
+  fi
 }
 
 download_nexusbox_installer() {
@@ -282,6 +338,7 @@ EOF
   else
     say "Keep existing config: $CONFIG_FILE"
   fi
+  import_config_from_url "$CONFIG_FILE" "standalone"
 
   "$MIHOMO_BIN" -t -d "$CONFIG_DIR"
 
@@ -351,6 +408,8 @@ fix_nexusbox_core() {
   backup_file "$NEXUSBOX_CORE"
   cp "$WORK_DIR/mihomo" "$NEXUSBOX_CORE"
   chmod 0755 "$NEXUSBOX_CORE"
+
+  import_config_from_url "${NEXUSBOX_CONFIG_DIR}/config.yaml" "nexusbox"
 
   "$NEXUSBOX_CORE" -v
   "$NEXUSBOX_CORE" -t -d "$NEXUSBOX_CONFIG_DIR"

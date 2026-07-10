@@ -92,6 +92,7 @@ LXC_PROXY=disable   清理容器内代理配置
 LXC_PROXY_ADDR=IP:端口
 LXC_PROXY_PORT=7897
 LXC_PROXY_COMMON_PORTS="7897 7890 7891 7892 1080 20171"
+CONFIG_URL=https://example.com/config.yaml，自动导入自定义规则配置
 ```
 
 已有容器模式会：
@@ -101,6 +102,7 @@ LXC_PROXY_COMMON_PORTS="7897 7890 7891 7892 1080 20171"
 - 如果 `ip=dhcp`，会启动容器并通过 `pct exec` 自动读取容器当前 IPv4。
 - 跳过创建容器阶段。
 - 继续配置 TUN、嵌套权限，并进入容器执行安装。
+- 如果设置了 `CONFIG_URL`，会在容器内下载自定义 `config.yaml`，备份旧配置，补齐 NexusBox 控制端口字段，测试配置后重启服务。
 
 ## 第 1 阶段：创建 LXC
 

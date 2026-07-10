@@ -44,6 +44,7 @@ INSTALL_PROFILE="unknown"
 INTERACTIVE="${INTERACTIVE:-auto}"
 NEXUSBOX_DEFAULT_INSTALL_URL="${NEXUSBOX_DEFAULT_INSTALL_URL:-https://raw.githubusercontent.com/Ladavian/NexusBox/main/install.sh}"
 NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-}"
+CONFIG_URL="${CONFIG_URL:-}"
 
 WORK_DIR="${WORK_DIR:-/tmp/pve-mihomo-router}"
 LOG="${LOG:-/root/pve-mihomo-router-install.log}"
@@ -597,7 +598,7 @@ run_in_container() {
   chmod +x "$local_install"
   pct push "$CTID" "$local_install" /root/mihomo-router-install.sh -perms 0755
 
-  local env_args=(MODE="$LXC_INSTALL_MODE" VERSION="$VERSION" NEXUSBOX_INSTALL_URL="$NEXUSBOX_INSTALL_URL" NEXUSBOX_DEFAULT_INSTALL_URL="$NEXUSBOX_DEFAULT_INSTALL_URL")
+  local env_args=(MODE="$LXC_INSTALL_MODE" VERSION="$VERSION" NEXUSBOX_INSTALL_URL="$NEXUSBOX_INSTALL_URL" NEXUSBOX_DEFAULT_INSTALL_URL="$NEXUSBOX_DEFAULT_INSTALL_URL" CONFIG_URL="$CONFIG_URL")
   if [ -n "$LXC_PROXY_HTTP" ]; then
     env_args+=(
       http_proxy="$LXC_PROXY_HTTP"
