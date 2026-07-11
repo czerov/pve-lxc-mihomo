@@ -66,7 +66,7 @@ mkdir -p "$WORK_DIR"
 exec > >(tee -a "$LOG") 2>&1
 
 say() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
-die() { say "ERROR: $*"; exit 1; }
+die() { say "错误：$*"; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 prefer_cn_accel_enabled() {
@@ -81,7 +81,7 @@ backup_file() {
   ts="$(date +%Y%m%d-%H%M%S)"
   if [ -e "$path" ]; then
     cp -a "$path" "${path}.bak-${ts}"
-    say "Backed up $path -> ${path}.bak-${ts}"
+    say "已备份：$path -> ${path}.bak-${ts}"
   fi
 }
 
@@ -107,10 +107,10 @@ download_best_url() {
   local usable_urls=()
 
   if prefer_cn_accel_enabled; then
-    say "Domestic acceleration preferred; trying sources in order"
+    say "已启用国内加速，按顺序尝试下载源"
     for url in "$@"; do
       [ -n "$url" ] || continue
-      say "Try preferred source: $url"
+      say "尝试优先下载源：$url"
       if fetch_url "$url" "$output" && [ -s "$output" ]; then
         return 0
       fi
@@ -118,17 +118,17 @@ download_best_url() {
     return 1
   fi
 
-  say "Probing download sources"
+  say "正在测速下载源"
   for url in "$@"; do
     [ -n "$url" ] || continue
-    say "Check: $url"
+    say "检测：$url"
     speed="$(probe_download_source "$url" || true)"
     if [ -z "$speed" ]; then
-      say "Unavailable: $url"
+      say "不可用：$url"
       continue
     fi
 
-    say "Available: $url (${speed} B/s)"
+    say "可用：$url（${speed} B/s）"
     usable_urls+=("$url")
     if awk "BEGIN {exit !($speed > $best_speed)}"; then
       best_speed="$speed"
@@ -137,25 +137,25 @@ download_best_url() {
   done
 
   if [ -n "$best_url" ]; then
-    say "Selected download source: $best_url (${best_speed} B/s)"
+    say "已选择下载源：$best_url（${best_speed} B/s）"
     if fetch_url "$best_url" "$output" && [ -s "$output" ]; then
       return 0
     fi
-    say "Selected source failed, trying remaining available sources."
+    say "已选下载源失败，继续尝试其他可用源。"
   fi
 
   for url in "${usable_urls[@]}"; do
     [ "$url" != "$best_url" ] || continue
-    say "Try available fallback: $url"
+    say "尝试备用下载源：$url"
     if fetch_url "$url" "$output" && [ -s "$output" ]; then
       return 0
     fi
   done
 
-  say "No probed source completed, trying all sources in order."
+  say "测速源均未完成下载，改为按顺序逐个尝试。"
   for url in "$@"; do
     [ -n "$url" ] || continue
-    say "Try download: $url"
+    say "尝试下载：$url"
     if fetch_url "$url" "$output" && [ -s "$output" ]; then
       return 0
     fi
@@ -164,15 +164,15 @@ download_best_url() {
 }
 
 require_pve_host() {
-  [ "$(id -u)" = "0" ] || die "Run as root on the PVE host."
+  [ "$(id -u)" = "0" ] || die "请在 PVE 宿主机使用 root 用户运行。"
   if ! have pct; then
     if systemd-detect-virt --container >/dev/null 2>&1 || [ -f /run/.containerenv ]; then
-      die "pct not found because this looks like an LXC/container. Run pve-install.sh on the PVE host. Inside an existing LXC, use install.sh instead."
+      die "当前环境像是 LXC 容器且找不到 pct。请在 PVE 宿主机运行 pve-install.sh；若只修复容器内部，请使用 install-cn.sh。"
     fi
-    die "pct not found. Run this on a Proxmox VE host."
+    die "找不到 pct，请在 Proxmox VE 宿主机运行。"
   fi
-  have pveam || die "pveam not found. Run this on a Proxmox VE host."
-  have curl || die "curl not found. Install curl on the PVE host first."
+  have pveam || die "找不到 pveam，请在 Proxmox VE 宿主机运行。"
+  have curl || die "找不到 curl，请先在 PVE 宿主机安装 curl。"
 }
 
 is_interactive() {
@@ -239,12 +239,12 @@ detect_storage() {
     elif pvesm status 2>/dev/null | awk 'NR > 1 {print $1}' | grep -Fxq 'local'; then
       CT_ROOTFS_STORAGE="local"
     else
-      die "Cannot detect rootfs storage. Set CT_ROOTFS_STORAGE manually."
+      die "无法自动检测 LXC 根磁盘存储，请手动设置 CT_ROOTFS_STORAGE。"
     fi
   elif ! pvesm status 2>/dev/null | awk 'NR > 1 {print $1}' | grep -Fxq "$CT_ROOTFS_STORAGE"; then
-    die "Storage '$CT_ROOTFS_STORAGE' does not exist. Check pvesm status or set CT_ROOTFS_STORAGE."
+    die "存储 '$CT_ROOTFS_STORAGE' 不存在，请检查 pvesm status 或重新设置 CT_ROOTFS_STORAGE。"
   fi
-  say "Using rootfs storage: $CT_ROOTFS_STORAGE"
+  say "使用 LXC 根磁盘存储：$CT_ROOTFS_STORAGE"
 }
 
 vmid_exists() {
@@ -261,14 +261,14 @@ auto_ctid_enabled() {
     1|true|yes|on) return 0 ;;
     0|false|no|off) return 1 ;;
     auto|"") [ "$CTID_WAS_SET" != "1" ] ;;
-    *) die "Invalid AUTO_CTID=$AUTO_CTID. Use auto, 1, or 0." ;;
+    *) die "AUTO_CTID=$AUTO_CTID 无效，请使用 auto、1 或 0。" ;;
   esac
 }
 
 find_free_ctid() {
   local start="$1" candidate
   case "$start" in
-    ''|*[!0-9]*) die "CTID must be numeric for automatic CTID selection: $start" ;;
+    ''|*[!0-9]*) die "自动选择 CTID 时起始值必须是数字：$start" ;;
   esac
 
   candidate="$((10#$start))"
@@ -284,24 +284,24 @@ find_free_ctid() {
 
 confirm_new_ctid() {
   case "$CTID" in
-    ''|*[!0-9]*) die "CTID must be numeric: $CTID" ;;
+    ''|*[!0-9]*) die "CTID 必须是数字：$CTID" ;;
   esac
 
   if vmid_exists "$CTID"; then
     if auto_ctid_enabled; then
       local old_ctid="$CTID"
-      CTID="$(find_free_ctid "$((10#$CTID + 1))")" || die "No free CTID found after $old_ctid."
-      say "CTID $old_ctid already exists; selected free CTID: $CTID"
+      CTID="$(find_free_ctid "$((10#$CTID + 1))")" || die "在 CTID $old_ctid 之后没有找到空闲 ID。"
+      say "CTID $old_ctid 已存在，自动选择空闲 CTID：$CTID"
       return 0
     fi
-    die "CTID $CTID already exists. Set AUTO_CTID=1 to choose the next free CTID, or use USE_EXISTING=1 CTID=$CTID to install into the existing LXC."
+    die "CTID $CTID 已存在。设置 AUTO_CTID=1 可自动选择下一个空闲 ID；使用 USE_EXISTING=1 CTID=$CTID 可安装到现有 LXC。"
   fi
-  say "Selected CTID: $CTID"
+  say "已选择 CTID：$CTID"
 }
 
 confirm_existing_ctid() {
   if ! vmid_exists "$CTID"; then
-    die "Existing CTID $CTID was not found. Check CTID or use new-container mode."
+    die "找不到现有 CTID $CTID，请检查 CTID 或改用新建容器模式。"
   fi
 }
 
@@ -356,7 +356,7 @@ ip_in_use() {
 }
 
 detect_network() {
-  say "Detecting PVE LAN network"
+  say "正在检测 PVE 局域网"
   local route_line dev gw pve_cidr pve_ip prefix network broadcast base candidate host candidates
 
   route_line="$(ip -4 route get 1.1.1.1 2>/dev/null | head -1 || true)"
@@ -369,7 +369,7 @@ detect_network() {
   if [ -z "$dev" ]; then
     dev="$(ip -o -4 addr show scope global | awk '{print $2; exit}')"
   fi
-  [ -n "$dev" ] || die "Cannot detect LAN interface. Set CT_BRIDGE, CT_IP_CIDR and CT_GW manually."
+  [ -n "$dev" ] || die "无法检测局域网接口，请手动设置 CT_BRIDGE、CT_IP_CIDR 和 CT_GW。"
 
   if [ -z "$CT_BRIDGE" ]; then
     if printf '%s' "$dev" | grep -q '^vmbr'; then
@@ -384,12 +384,12 @@ detect_network() {
   if [ -z "$pve_cidr" ] && [ "$CT_BRIDGE" != "$dev" ]; then
     pve_cidr="$(ip -o -4 addr show dev "$dev" scope global 2>/dev/null | awk '{print $4; exit}')"
   fi
-  [ -n "$pve_cidr" ] || die "Cannot detect PVE LAN IP. Set CT_IP_CIDR manually."
+  [ -n "$pve_cidr" ] || die "无法检测 PVE 局域网 IP，请手动设置 CT_IP_CIDR。"
 
   pve_ip="${pve_cidr%/*}"
   prefix="${pve_cidr#*/}"
   [ -n "$CT_GW" ] || CT_GW="$gw"
-  [ -n "$CT_GW" ] || die "Cannot detect default gateway. Set CT_GW manually."
+  [ -n "$CT_GW" ] || die "无法检测默认网关，请手动设置 CT_GW。"
 
   if [ -z "$CT_IP_CIDR" ]; then
     local mask_int pve_int net_int bcast_int
@@ -412,7 +412,7 @@ detect_network() {
     done
 
     if [ -z "$CT_IP_CIDR" ]; then
-      say "Common IP candidates are unavailable; scanning the local subnet"
+      say "常用候选 IP 均不可用，开始扫描当前子网"
       local start_int end_int cur_int scan_end_int
       start_int="$((net_int + 2))"
       end_int="$((bcast_int - 1))"
@@ -434,21 +434,21 @@ detect_network() {
     fi
   fi
 
-  say "Detected bridge: $CT_BRIDGE"
-  say "Detected PVE IP: $pve_cidr"
-  say "Detected gateway: $CT_GW"
-  [ -n "$CT_IP_CIDR" ] || die "Cannot choose an unused LXC IP. Set CT_IP_CIDR manually, for example: CT_IP_CIDR=<free-ip>/${prefix} CT_GW=${CT_GW} CT_BRIDGE=${CT_BRIDGE} bash pve-install.sh"
-  say "Selected LXC IP: $CT_IP_CIDR"
+  say "检测到网桥：$CT_BRIDGE"
+  say "检测到 PVE IP：$pve_cidr"
+  say "检测到网关：$CT_GW"
+  [ -n "$CT_IP_CIDR" ] || die "无法选择空闲 LXC IP，请手动设置，例如：CT_IP_CIDR=<空闲IP>/${prefix} CT_GW=${CT_GW} CT_BRIDGE=${CT_BRIDGE} bash pve-install-cn.sh"
+  say "已选择 LXC IP：$CT_IP_CIDR"
 }
 
 detect_existing_container_network() {
-  say "Detecting existing LXC $CTID network"
+  say "正在检测现有 LXC $CTID 的网络配置"
   local conf="/etc/pve/lxc/${CTID}.conf"
   local net0 ip gw bridge status runtime_ip prefix
-  [ -e "$conf" ] || die "LXC config not found: $conf"
+  [ -e "$conf" ] || die "找不到 LXC 配置：$conf"
 
   net0="$(sed -n 's/^net0: //p' "$conf" | head -1)"
-  [ -n "$net0" ] || die "Cannot find net0 in $conf"
+  [ -n "$net0" ] || die "在 $conf 中找不到 net0。"
 
   bridge="$(printf '%s\n' "$net0" | tr ',' '\n' | sed -n 's/^bridge=//p' | head -1)"
   ip="$(printf '%s\n' "$net0" | tr ',' '\n' | sed -n 's/^ip=//p' | head -1)"
@@ -463,14 +463,14 @@ detect_existing_container_network() {
 
   status="$(pct status "$CTID" | awk '{print $2}')"
   if [ "$status" != "running" ]; then
-    say "Starting existing LXC $CTID for IP detection"
+    say "启动现有 LXC $CTID 以检测运行时 IP"
     pct start "$CTID"
     sleep 3
   fi
 
   if [ -z "$CT_IP_CIDR" ] || printf '%s' "$CT_IP_CIDR" | grep -qi '^dhcp$'; then
     runtime_ip="$(pct exec "$CTID" -- sh -c \"ip -o -4 addr show scope global | awk '{print \\\$4; exit}'\" 2>/dev/null || true)"
-    [ -n "$runtime_ip" ] || die "Cannot detect existing LXC runtime IP. Set CT_IP_CIDR manually."
+    [ -n "$runtime_ip" ] || die "无法检测现有 LXC 的运行时 IP，请手动设置 CT_IP_CIDR。"
     CT_IP_CIDR="$runtime_ip"
   fi
 
@@ -483,13 +483,13 @@ detect_existing_container_network() {
 
   prefix="${CT_IP_CIDR#*/}"
   if [ "$prefix" = "$CT_IP_CIDR" ]; then
-    say "Existing LXC IP has no CIDR prefix; assuming /24"
+    say "现有 LXC IP 没有 CIDR 前缀，按 /24 处理"
     CT_IP_CIDR="${CT_IP_CIDR}/24"
   fi
 
-  say "Existing LXC bridge: ${CT_BRIDGE:-unknown}"
-  say "Existing LXC gateway: ${CT_GW:-unknown}"
-  say "Existing LXC IP: $CT_IP_CIDR"
+  say "现有 LXC 网桥：${CT_BRIDGE:-未知}"
+  say "现有 LXC 网关：${CT_GW:-未知}"
+  say "现有 LXC IP：$CT_IP_CIDR"
 }
 
 download_with_fallback() {
@@ -535,9 +535,9 @@ download_template_from_mirrors() {
 
   mkdir -p "$(dirname "$output")"
   for url in "${urls[@]}"; do
-    say "Check template mirror: $url"
+    say "检测模板镜像：$url"
     if ! curl -fsI --connect-timeout 8 --max-time 15 "$url" >/dev/null 2>&1; then
-      say "Mirror unavailable: $url"
+      say "模板镜像不可用：$url"
       continue
     fi
     speed="$(curl -fL --range 0-1048575 --connect-timeout 8 --max-time 15 -o /dev/null -w '%{speed_download}' "$url" 2>/dev/null || true)"
@@ -545,7 +545,7 @@ download_template_from_mirrors() {
     case "$speed" in
       ''|*[!0-9]*) speed=0 ;;
     esac
-    say "Mirror speed sample: ${speed} B/s"
+    say "模板镜像测速：${speed} B/s"
     usable_urls+=("$url")
     if awk "BEGIN {exit !($speed > $best_speed)}"; then
       best_speed="$speed"
@@ -556,21 +556,21 @@ download_template_from_mirrors() {
   [ "${#usable_urls[@]}" -gt 0 ] || return 1
 
   if [ -n "$best_url" ]; then
-    say "Selected fastest template mirror: $best_url (${best_speed} B/s)"
+    say "已选择最快模板镜像：$best_url（${best_speed} B/s）"
     if curl -fL --connect-timeout 15 --retry 2 -o "$output" "$best_url"; then
       [ -s "$output" ] && return 0
     fi
-    say "Fastest mirror download failed, trying remaining mirrors."
+    say "最快镜像下载失败，继续尝试其他镜像。"
   fi
 
   for url in "${usable_urls[@]}"; do
     [ "$url" != "$best_url" ] || continue
-    say "Downloading LXC template from mirror: $url"
+    say "从镜像下载 LXC 模板：$url"
     if curl -fL --connect-timeout 15 --retry 2 -o "$output" "$url"; then
       [ -s "$output" ] || continue
       return 0
     fi
-    say "Template download failed, trying next mirror."
+    say "模板下载失败，尝试下一个镜像。"
   done
   return 1
 }
@@ -581,17 +581,17 @@ choose_template() {
     local filename template_path
     filename="${TEMPLATE_URL%%\?*}"
     filename="${filename##*/}"
-    [ -n "$filename" ] || die "Cannot parse template filename from TEMPLATE_URL."
+    [ -n "$filename" ] || die "无法从 TEMPLATE_URL 解析模板文件名。"
     template_path="$(template_path_for_name "$filename")"
     mkdir -p "$(dirname "$template_path")"
     if [ ! -s "$template_path" ]; then
-      say "Downloading LXC template from TEMPLATE_URL: $TEMPLATE_URL"
-      download_with_fallback "$TEMPLATE_URL" "$template_path" || die "Failed to download TEMPLATE_URL."
+      say "从 TEMPLATE_URL 下载 LXC 模板：$TEMPLATE_URL"
+      download_with_fallback "$TEMPLATE_URL" "$template_path" || die "下载 TEMPLATE_URL 失败。"
     else
-      say "Use existing template file: $template_path"
+      say "使用已有模板文件：$template_path"
     fi
     TEMPLATE="${CT_TEMPLATE_STORAGE}:vztmpl/${filename}"
-    say "Use custom template: $TEMPLATE"
+    say "使用自定义模板：$TEMPLATE"
     return 0
   fi
 
@@ -606,15 +606,15 @@ choose_template() {
     fi
     if [ -n "$existing" ]; then
       TEMPLATE="$existing"
-      say "Use preferred template: $TEMPLATE"
+      say "使用首选模板：$TEMPLATE"
       return 0
     fi
-    say "Preferred template was not found locally: $CT_TEMPLATE_NAME"
+    say "本地未找到首选模板：$CT_TEMPLATE_NAME"
     local preferred_path
     preferred_path="$(template_path_for_name "$CT_TEMPLATE_NAME")"
     if download_template_from_mirrors "$CT_TEMPLATE_NAME" "$preferred_path"; then
       TEMPLATE="${CT_TEMPLATE_STORAGE}:vztmpl/${CT_TEMPLATE_NAME}"
-      say "Use downloaded preferred template: $TEMPLATE"
+      say "使用已下载的首选模板：$TEMPLATE"
       return 0
     fi
   fi
@@ -622,24 +622,24 @@ choose_template() {
   existing="$(pveam list "$CT_TEMPLATE_STORAGE" 2>/dev/null | awk '/debian-13-standard.*amd64.*(tar.zst|tar.gz)/{print $1}' | sort -V | tail -1 || true)"
   if [ -n "$existing" ]; then
     TEMPLATE="$existing"
-    say "Use existing template: $TEMPLATE"
+    say "使用已有模板：$TEMPLATE"
     return 0
   fi
 
-  say "Updating LXC template list"
+  say "正在更新 LXC 模板列表"
   pveam update
   latest="$(pveam available --section system | awk '/debian-13-standard.*amd64.*(tar.zst|tar.gz)/{print $2}' | sort -V | tail -1 || true)"
   if [ -z "$latest" ]; then
     latest="$(pveam available --section system | awk '/debian-12-standard.*amd64.*(tar.zst|tar.gz)/{print $2}' | sort -V | tail -1 || true)"
   fi
-  [ -n "$latest" ] || die "Cannot find Debian 13/12 amd64 LXC template."
-  say "Downloading template: $latest"
+  [ -n "$latest" ] || die "找不到 Debian 13/12 amd64 LXC 模板。"
+  say "正在下载模板：$latest"
   pveam download "$CT_TEMPLATE_STORAGE" "$latest"
   TEMPLATE="${CT_TEMPLATE_STORAGE}:vztmpl/${latest}"
 }
 
 create_container() {
-  say "Creating LXC $CTID ($CT_HOSTNAME)"
+  say "正在创建 LXC $CTID（$CT_HOSTNAME）"
   local password_args=()
   [ -n "$CT_PASSWORD" ] && password_args=(--password "$CT_PASSWORD")
 
@@ -665,8 +665,8 @@ ensure_lxc_conf_line() {
 
 configure_lxc_tun() {
   local conf="/etc/pve/lxc/${CTID}.conf"
-  say "Configuring LXC TUN and nesting"
-  [ -e "$conf" ] || die "LXC config not found: $conf"
+  say "正在配置 LXC TUN、嵌套和 keyctl"
+  [ -e "$conf" ] || die "找不到 LXC 配置：$conf"
   backup_file "$conf"
   pct set "$CTID" --features nesting=1,keyctl=1
   ensure_lxc_conf_line "$conf" "lxc.cgroup2.devices.allow: c 10:200 rwm"
@@ -674,7 +674,7 @@ configure_lxc_tun() {
 }
 
 start_container() {
-  say "Starting LXC $CTID"
+  say "正在启动 LXC $CTID"
   if ! pct status "$CTID" | grep -q 'running'; then
     pct start "$CTID"
   fi
@@ -682,7 +682,7 @@ start_container() {
     pct exec "$CTID" -- test -e /proc/1/status >/dev/null 2>&1 && return 0
     sleep 1
   done
-  die "Container did not become ready."
+  die "容器未能在规定时间内就绪。"
 }
 
 PROXY_HINT_LIST=""
@@ -747,13 +747,13 @@ setup_lxc_proxy() {
       return 0
       ;;
     disable)
-      say "Disabling proxy inside LXC"
+      say "正在关闭 LXC 内代理"
       ;;
     auto|on)
-      say "Configuring proxy inside LXC: LXC_PROXY=$LXC_PROXY"
+      say "正在配置 LXC 内代理：LXC_PROXY=$LXC_PROXY"
       ;;
     *)
-      die "Unknown LXC_PROXY=$LXC_PROXY. Use off, auto, on, or disable."
+      die "未知 LXC_PROXY=$LXC_PROXY，请使用 off、auto、on 或 disable。"
       ;;
   esac
 
@@ -761,7 +761,7 @@ setup_lxc_proxy() {
   if [ -f "./proxy.sh" ]; then
     cp ./proxy.sh "$local_proxy"
   else
-    download_with_fallback "$PROXY_URL" "$local_proxy" || die "Failed to download proxy.sh"
+    download_with_fallback "$PROXY_URL" "$local_proxy" || die "下载 proxy.sh 失败。"
   fi
   chmod +x "$local_proxy"
   pct push "$CTID" "$local_proxy" /root/lxc-proxy.sh -perms 0755
@@ -775,7 +775,7 @@ setup_lxc_proxy() {
   if [ "$LXC_PROXY" = "auto" ]; then
     local proxy_hints
     proxy_hints="$(detect_proxy_hints || true)"
-    [ -n "$proxy_hints" ] && say "LXC proxy auto-detect hints: $proxy_hints"
+    [ -n "$proxy_hints" ] && say "LXC 代理自动检测候选：$proxy_hints"
     proxy_addr="$(pct exec "$CTID" -- env \
       PROXY_ADDR="$LXC_PROXY_ADDR" \
       PROXY_HINTS="$proxy_hints" \
@@ -784,10 +784,10 @@ setup_lxc_proxy() {
       COMMON_PORTS="$LXC_PROXY_COMMON_PORTS" \
       bash /root/lxc-proxy.sh detect 2>/dev/null || true)"
     if [ -z "$proxy_addr" ]; then
-      say "No online LXC proxy detected. Continue without proxy."
+      say "未检测到可用 LXC 代理，将不使用代理继续安装。"
       return 0
     fi
-    say "Detected online LXC proxy: $proxy_addr"
+    say "检测到可用 LXC 代理：$proxy_addr"
   else
     proxy_addr="$LXC_PROXY_ADDR"
   fi
@@ -801,17 +801,17 @@ setup_lxc_proxy() {
   proxy_addr="$(pct exec "$CTID" -- sh -c "sed -n 's/.*http:\\/\\/\\([^\"]*\\).*/\\1/p' /etc/apt/apt.conf.d/99proxy 2>/dev/null | head -1" || true)"
   if [ -n "$proxy_addr" ]; then
     LXC_PROXY_HTTP="http://${proxy_addr}"
-    say "LXC installer will use proxy: $LXC_PROXY_HTTP"
+    say "LXC 安装过程将使用代理：$LXC_PROXY_HTTP"
   fi
 }
 
 run_in_container() {
-  say "Running installer inside LXC"
+  say "正在 LXC 内运行安装脚本"
   local local_install="$WORK_DIR/install.sh"
   if [ -f "./install.sh" ]; then
     cp ./install.sh "$local_install"
   else
-    download_with_fallback "$INSTALL_URL" "$local_install" || die "Failed to download install.sh"
+    download_with_fallback "$INSTALL_URL" "$local_install" || die "下载 install.sh 失败。"
   fi
   chmod +x "$local_install"
   pct push "$CTID" "$local_install" /root/mihomo-router-install.sh -perms 0755
@@ -829,7 +829,7 @@ run_in_container() {
 }
 
 verify_container_health() {
-  say "Verifying LXC runtime health"
+  say "正在验证 LXC 运行状态"
   local result
   result="$(pct exec "$CTID" -- sh -s <<'EOS'
 set -eu
@@ -838,15 +838,15 @@ profile=standalone
 if [ -x /opt/nexusbox/nexusbox ]; then
   profile=nexusbox
 fi
-echo "profile=${profile}"
+echo "安装类型=${profile}"
 
 check_cmd() {
   label="$1"
   shift
   if "$@"; then
-    echo "ok: ${label}"
+    echo "正常：${label}"
   else
-    echo "fail: ${label}"
+    echo "失败：${label}"
     fail=1
   fi
 }
@@ -855,9 +855,9 @@ check_port() {
   port="$1"
   label="$2"
   if ss -lntup 2>/dev/null | grep -Eq "[:.]${port}[[:space:]]"; then
-    echo "ok: ${label} port ${port}"
+    echo "正常：${label} 端口 ${port}"
   else
-    echo "fail: ${label} port ${port}"
+    echo "失败：${label} 端口 ${port}"
     fail=1
   fi
 }
@@ -887,15 +887,15 @@ check_dns_runtime() {
   config_file="$1"
   dns_port="$(detect_dns_port "$config_file" || true)"
   if [ -z "$dns_port" ]; then
-    echo "warn: dns.listen not found in ${config_file}"
+    echo "警告：${config_file} 中未找到 dns.listen"
     return 0
   fi
-  check_port "$dns_port" "Mihomo DNS"
+  check_port "$dns_port" "Mihomo DNS 服务"
   if [ "$dns_port" != "53" ]; then
     if iptables -t nat -S PREROUTING 2>/dev/null | grep -Eq -- "--dport 53 .*--to-ports ${dns_port}"; then
-      echo "ok: DNS redirect 53 -> ${dns_port}"
+      echo "正常：DNS 转发 53 -> ${dns_port}"
     else
-      echo "fail: DNS redirect 53 -> ${dns_port}"
+      echo "失败：DNS 转发 53 -> ${dns_port}"
       fail=1
     fi
   fi
@@ -922,44 +922,44 @@ check_transparent_runtime() {
   config_file="$1"
   redir_port="$(detect_redir_port "$config_file" || true)"
   if [ -z "$redir_port" ]; then
-    echo "warn: redir-port not found in ${config_file}"
+    echo "警告：${config_file} 中未找到 redir-port"
     return 0
   fi
-  check_port "$redir_port" "Mihomo transparent redirect"
+  check_port "$redir_port" "Mihomo TCP 透明代理"
   if iptables -t nat -S PREROUTING 2>/dev/null | grep -q -- '-j MIHOMO_REDIRECT' && iptables -t nat -S MIHOMO_REDIRECT 2>/dev/null | grep -Eq -- "--to-ports ${redir_port}"; then
-    echo "ok: Transparent TCP redirect -> ${redir_port}"
+    echo "正常：TCP 透明代理 -> ${redir_port}"
   else
-    echo "fail: Transparent TCP redirect -> ${redir_port}"
+    echo "失败：TCP 透明代理 -> ${redir_port}"
     fail=1
   fi
 }
 
 if [ "$profile" = "nexusbox" ]; then
-  check_cmd "NexusBox process" pgrep -f /opt/nexusbox/nexusbox
-  check_port 18080 "NexusBox UI"
+  check_cmd "NexusBox 进程" pgrep -f /opt/nexusbox/nexusbox
+  check_port 18080 "NexusBox 管理页面"
   check_dns_runtime /opt/config/config.yaml
   check_transparent_runtime /opt/config/config.yaml
 else
-  check_cmd "mihomo.service active" systemctl is-active --quiet mihomo
-  check_cmd "Mihomo process" pgrep -f "/usr/local/bin/mihomo -d /etc/mihomo"
+  check_cmd "mihomo.service 运行状态" systemctl is-active --quiet mihomo
+  check_cmd "Mihomo 进程" pgrep -f "/usr/local/bin/mihomo -d /etc/mihomo"
   check_dns_runtime /etc/mihomo/config.yaml
   check_transparent_runtime /etc/mihomo/config.yaml
 fi
 
-check_port 7890 "Mihomo mixed proxy"
-check_port 9090 "Mihomo controller API"
+check_port 7890 "Mihomo HTTP/SOCKS 代理"
+check_port 9090 "Mihomo 控制接口"
 
 if [ "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo 0)" = "1" ]; then
-  echo "ok: ip_forward enabled"
+  echo "正常：IPv4 转发已开启"
 else
-  echo "fail: ip_forward disabled"
+  echo "失败：IPv4 转发未开启"
   fail=1
 fi
 
 if iptables -t nat -S POSTROUTING 2>/dev/null | grep -q -- '-j MASQUERADE'; then
-  echo "ok: NAT MASQUERADE rule"
+  echo "正常：NAT MASQUERADE 规则"
 else
-  echo "fail: NAT MASQUERADE rule"
+  echo "失败：缺少 NAT MASQUERADE 规则"
   fail=1
 fi
 
@@ -967,35 +967,35 @@ exit "$fail"
 EOS
 )" || {
     printf '%s\n' "$result"
-    die "LXC runtime verification failed."
+    die "LXC 运行状态验证失败。"
   }
   printf '%s\n' "$result"
-  INSTALL_PROFILE="$(printf '%s\n' "$result" | sed -n 's/^profile=//p' | head -1)"
+  INSTALL_PROFILE="$(printf '%s\n' "$result" | sed -n 's/^安装类型=//p' | head -1)"
   [ -n "$INSTALL_PROFILE" ] || INSTALL_PROFILE="unknown"
 }
 
 print_summary() {
   local ip="${CT_IP_CIDR%/*}"
-  say "Stage 1-4 completed"
-  echo "LXC ID: $CTID"
-  echo "LXC IP: $ip"
-  echo "Install profile: $INSTALL_PROFILE"
+  say "第 1-4 阶段已完成"
+  echo "LXC ID：$CTID"
+  echo "LXC IP：$ip"
+  echo "安装类型：$INSTALL_PROFILE"
   if [ "$INSTALL_PROFILE" = "nexusbox" ]; then
-    echo "NexusBox UI: http://${ip}:18080"
+    echo "NexusBox 管理页面：http://${ip}:18080"
   else
-    echo "NexusBox UI: not installed (standalone Mihomo mode)"
+    echo "NexusBox 管理页面：未安装（纯 Mihomo 模式）"
   fi
-  echo "Mihomo mixed proxy: ${ip}:7890"
-  echo "Mihomo controller API: http://${ip}:9090"
-  [ "$INSTALL_PROFILE" = "standalone" ] && echo "Mihomo DNS: ${ip}:1053"
-  [ -n "$LXC_PROXY_HTTP" ] && echo "LXC proxy used during install: $LXC_PROXY_HTTP"
+  echo "Mihomo HTTP/SOCKS 代理：${ip}:7890"
+  echo "Mihomo 控制接口：http://${ip}:9090"
+  [ "$INSTALL_PROFILE" = "standalone" ] && echo "Mihomo DNS：${ip}:1053"
+  [ -n "$LXC_PROXY_HTTP" ] && echo "安装时使用的 LXC 代理：$LXC_PROXY_HTTP"
   echo
-  echo "Stage 5 still needs router settings:"
-  echo "  option A: set client gateway to ${ip}"
-  echo "  option B: keep current gateway, set client DNS to ${ip}, and add route 28.0.0.0/8 -> ${ip}"
-  echo "  client DNS: ${ip}"
+  echo "第 5 阶段需要在主路由或终端设置："
+  echo "  方式 A：把客户端网关和 DNS 设置为 ${ip}"
+  echo "  方式 B：保留原网关，把 DNS 设置为 ${ip}，并添加静态路由 28.0.0.0/8 -> ${ip}"
+  echo "  客户端 DNS：${ip}"
   echo
-  echo "Log file: $LOG"
+  echo "安装日志：$LOG"
 }
 
 main() {

@@ -14,16 +14,10 @@ INTERACTIVE=0 LXC_INSTALL_MODE=standalone LXC_PROXY=auto bash <(curl -fsSL ...)
 
 ## 一键命令
 
-国外网络：
+中文交互入口：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
-```
-
-国内网络：
-
-```bash
-bash <(curl -fsSL https://gh.llkk.cc/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
+bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install-cn.sh)
 ```
 
 CDN 入口：
@@ -37,7 +31,7 @@ bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-ins
 默认会自动检测 PVE 当前内网：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
+bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install-cn.sh)
 ```
 
 脚本会自动检测：
@@ -57,19 +51,19 @@ CT_GW=192.168.1.1 \
 CT_BRIDGE=vmbr0 \
 CT_ROOTFS_STORAGE=local-lvm \
 CT_TEMPLATE_STORAGE=local \
-bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
+bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install-cn.sh)
 ```
 
 已有 LXC 容器则使用：
 
 ```bash
-USE_EXISTING=1 CTID=109 bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
+USE_EXISTING=1 CTID=109 bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install-cn.sh)
 ```
 
 如果 LXC 内下载 GitHub / apt 较慢，可以把代理助手融入自动流程：
 
 ```bash
-LXC_PROXY=auto bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
+LXC_PROXY=auto bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install-cn.sh)
 ```
 
 `LXC_PROXY=auto` 会把 PVE 当前 SSH/FinalShell 来源 IP、PVE 邻居表、网关、DNS 和常见 Clash/Mihomo 端口传入容器探测，只有探测到在线代理才启用；没有探测到就继续直连安装。
@@ -79,7 +73,7 @@ LXC_PROXY=auto bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lx
 ```bash
 LXC_PROXY=on \
 LXC_PROXY_ADDR=192.168.1.100:7897 \
-bash <(curl -fsSL https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install.sh)
+bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install-cn.sh)
 ```
 
 常用参数：

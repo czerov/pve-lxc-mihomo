@@ -17,7 +17,7 @@ download_first_available() {
   shift
 
   for url in "$@"; do
-    say "Try: $url"
+    say "尝试下载：$url"
     if curl -fsSL --connect-timeout 20 --speed-limit 1024 --speed-time 30 --retry 2 -o "$output" "$url" && [ -s "$output" ]; then
       return 0
     fi
@@ -36,7 +36,7 @@ download_first_available "$tmp" \
   "${CDN_BASE}/pve-install.sh" \
   "https://fastly.jsdelivr.net/gh/${REPO}@${BRANCH}/pve-install.sh" \
   "https://testingcf.jsdelivr.net/gh/${REPO}@${BRANCH}/pve-install.sh" || {
-    echo "All download attempts failed." >&2
+    echo "所有下载地址均失败，请检查网络或代理。" >&2
     exit 1
   }
 

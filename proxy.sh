@@ -30,7 +30,7 @@ fi
 
 say() { printf '%b\n' "$*"; }
 die() {
-  say "${RED}ERROR: $*${NC}" >&2
+  say "${RED}错误：$*${NC}" >&2
   if [ "$PVE_PROXY_SOURCED" = "1" ]; then
     return 1
   fi
@@ -38,7 +38,7 @@ die() {
 }
 
 need_root() {
-  [ "$(id -u)" = "0" ] || die "Please run as root."
+  [ "$(id -u)" = "0" ] || die "请使用 root 用户运行。"
 }
 
 have() {
@@ -232,9 +232,9 @@ EOF
   export https_proxy="http://${addr}"
   export HTTP_PROXY="http://${addr}"
   export HTTPS_PROXY="http://${addr}"
-  say "${GREEN}Proxy enabled: http://${addr}${NC}"
-  say "APT config: $APT_CONF"
-  say "Shell profile: $PROFILE_CONF"
+  say "${GREEN}代理已开启：http://${addr}${NC}"
+  say "APT 配置：$APT_CONF"
+  say "Shell 环境配置：$PROFILE_CONF"
 }
 
 disable_proxy() {
@@ -246,7 +246,7 @@ disable_proxy() {
     rm "$PROFILE_CONF"
   fi
   unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy ALL_PROXY
-  say "${YELLOW}Proxy disabled.${NC}"
+  say "${YELLOW}代理已关闭。${NC}"
 }
 
 current_proxy_addr() {
@@ -258,13 +258,13 @@ current_proxy_addr() {
 show_status() {
   local addr
   addr="$(current_proxy_addr || true)"
-  say "${YELLOW}=== Debian LXC proxy helper ===${NC}"
+  say "${YELLOW}=== Debian LXC 代理助手 ===${NC}"
   if [ -n "$addr" ]; then
-    say "APT proxy: ${GREEN}ON${NC} http://${addr}"
+    say "APT 代理：${GREEN}已开启${NC} http://${addr}"
   else
-    say "APT proxy: ${RED}OFF${NC}"
+    say "APT 代理：${RED}已关闭${NC}"
     addr="$(auto_detect_proxy)"
-    say "Auto candidate: http://${addr}"
+    say "自动检测候选：http://${addr}"
   fi
 
   if [ -n "$addr" ]; then
@@ -272,9 +272,9 @@ show_status() {
     host="${addr%:*}"
     port="${addr##*:}"
     if tcp_probe "$host" "$port"; then
-      say "Probe: ${GREEN}online${NC} ${host}:${port}"
+      say "检测结果：${GREEN}在线${NC} ${host}:${port}"
     else
-      say "Probe: ${RED}offline${NC} ${host}:${port}"
+      say "检测结果：${RED}离线${NC} ${host}:${port}"
     fi
   fi
 }
@@ -285,13 +285,13 @@ open_menu() {
     clear 2>/dev/null || true
     show_status
     say "--------------------------------"
-    say "1. Enable proxy automatically"
-    say "2. Enter proxy address manually"
-    say "3. Disable proxy"
-    say "4. Refresh"
-    say "5. Exit"
+    say "1. 自动检测并开启代理"
+    say "2. 手动输入代理地址"
+    say "3. 关闭代理"
+    say "4. 刷新状态"
+    say "5. 退出"
     say "--------------------------------"
-    printf 'Choose [1-5]: '
+    printf '请选择 [1-5]：'
     read -r choice
 
     case "$choice" in
@@ -301,9 +301,9 @@ open_menu() {
         sleep 1
         ;;
       2)
-        printf 'Proxy IP or host: '
+        printf '代理 IP 或主机名：'
         read -r input_ip
-        printf 'Proxy port [%s]: ' "$DEFAULT_PORT"
+        printf '代理端口 [默认 %s]：' "$DEFAULT_PORT"
         read -r input_port
         [ -n "$input_ip" ] || input_ip="$(detect_gateway)"
         [ -n "$input_port" ] || input_port="$DEFAULT_PORT"
@@ -321,7 +321,7 @@ open_menu() {
         break
         ;;
       *)
-        say "${RED}Invalid choice.${NC}"
+        say "${RED}无效选择。${NC}"
         sleep 1
         ;;
     esac
@@ -330,7 +330,7 @@ open_menu() {
 
 usage() {
   cat <<'EOF'
-Usage:
+用法：
   source <(curl -fsSL URL/proxy.sh)
   bash proxy.sh menu
   bash proxy.sh on [host:port]
@@ -338,7 +338,7 @@ Usage:
   bash proxy.sh status
   bash proxy.sh detect
 
-Environment:
+环境变量：
   PROXY_ADDR=192.168.1.100:7897
   PROXY_PORT=7897
   COMMON_PORTS="7897 7890 7891 7892 7893 7895 7896 7899 1080 10808 10809 20170 20171"
@@ -369,7 +369,7 @@ main() {
       usage
       ;;
     *)
-      die "Unknown command: $cmd"
+      die "未知命令：$cmd"
       ;;
   esac
 }

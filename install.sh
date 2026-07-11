@@ -37,7 +37,7 @@ mkdir -p "$WORK_DIR"
 exec > >(tee -a "$LOG") 2>&1
 
 say() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
-die() { say "ERROR: $*"; exit 1; }
+die() { say "错误：$*"; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 prefer_cn_accel_enabled() {
   case "$PREFER_CN_ACCEL" in
@@ -51,7 +51,7 @@ backup_file() {
   ts="$(date +%Y%m%d-%H%M%S)"
   if [ -e "$path" ]; then
     cp -a "$path" "${path}.bak-${ts}"
-    say "Backed up $path -> ${path}.bak-${ts}"
+    say "已备份：$path -> ${path}.bak-${ts}"
   fi
 }
 
@@ -62,7 +62,7 @@ fetch_url() {
   elif have wget; then
     wget -T 20 -t 2 -O "$output" "$url"
   else
-    die "curl/wget is missing. Install curl first."
+    die "缺少 curl/wget，请先安装 curl。"
   fi
 }
 
@@ -73,7 +73,7 @@ probe_download_source() {
   elif have wget; then
     fetch_url "$url" /dev/null >/dev/null 2>&1 && speed=1 || speed=0
   else
-    die "curl/wget is missing. Install curl first."
+    die "缺少 curl/wget，请先安装 curl。"
   fi
 
   speed="${speed%.*}"
@@ -90,10 +90,10 @@ download_best_url() {
   local usable_urls=()
 
   if prefer_cn_accel_enabled; then
-    say "Domestic acceleration preferred; trying sources in order"
+    say "已启用国内加速，按顺序尝试下载源"
     for url in "$@"; do
       [ -n "$url" ] || continue
-      say "Try preferred source: $url"
+      say "尝试优先下载源：$url"
       if fetch_url "$url" "$output" && [ -s "$output" ]; then
         return 0
       fi
@@ -101,17 +101,17 @@ download_best_url() {
     return 1
   fi
 
-  say "Probing download sources"
+  say "正在测速下载源"
   for url in "$@"; do
     [ -n "$url" ] || continue
-    say "Check: $url"
+    say "检测：$url"
     speed="$(probe_download_source "$url" || true)"
     if [ -z "$speed" ]; then
-      say "Unavailable: $url"
+      say "不可用：$url"
       continue
     fi
 
-    say "Available: $url (${speed} B/s)"
+    say "可用：$url（${speed} B/s）"
     usable_urls+=("$url")
     if awk "BEGIN {exit !($speed > $best_speed)}"; then
       best_speed="$speed"
@@ -120,25 +120,25 @@ download_best_url() {
   done
 
   if [ -n "$best_url" ]; then
-    say "Selected download source: $best_url (${best_speed} B/s)"
+    say "已选择下载源：$best_url（${best_speed} B/s）"
     if fetch_url "$best_url" "$output" && [ -s "$output" ]; then
       return 0
     fi
-    say "Selected source failed, trying remaining available sources."
+    say "已选下载源失败，继续尝试其他可用源。"
   fi
 
   for url in "${usable_urls[@]}"; do
     [ "$url" != "$best_url" ] || continue
-    say "Try available fallback: $url"
+    say "尝试备用下载源：$url"
     if fetch_url "$url" "$output" && [ -s "$output" ]; then
       return 0
     fi
   done
 
-  say "No probed source completed, trying all sources in order."
+  say "测速源均未完成下载，改为按顺序逐个尝试。"
   for url in "$@"; do
     [ -n "$url" ] || continue
-    say "Try: $url"
+    say "尝试下载：$url"
     if fetch_url "$url" "$output" && [ -s "$output" ]; then
       return 0
     fi
@@ -183,7 +183,7 @@ set_nexusbox_merge_mode() {
   backup_file "$file"
   set_json_string_field "$file" "mode" "merge"
   set_json_string_field "$file" "rule_group" "full"
-  say "NexusBox subscription mode set to merge so subscriptions provide nodes only."
+  say "NexusBox 订阅模式已设置为融合，机场订阅只提供节点。"
 }
 
 detect_dns_listen_port() {
@@ -224,7 +224,7 @@ detect_redir_port() {
 }
 
 require_root() {
-  [ "$(id -u)" = "0" ] || die "Please run as root."
+  [ "$(id -u)" = "0" ] || die "请使用 root 用户运行。"
 }
 
 detect_egress_iface() {
@@ -262,34 +262,34 @@ missing_amd64_v3_flags() {
 choose_asset() {
   local arch missing_flags
   arch="$(uname -m)"
-  say "CPU detection: arch=$arch"
+  say "CPU 检测：架构=$arch"
   case "$arch" in
     x86_64)
       if cpu_supports_amd64_v3; then
-        say "CPU amd64-v3 support: yes"
+        say "CPU 支持 amd64-v3：是"
         CORE_KIND="amd64-v3"
         ASSET="mihomo-linux-amd64-v3-${VERSION}.gz"
       else
         missing_flags="$(missing_amd64_v3_flags)"
         if [ -n "$missing_flags" ]; then
-          say "CPU amd64-v3 support: no; missing flags: $missing_flags"
+          say "CPU 支持 amd64-v3：否；缺少指令：$missing_flags"
         else
-          say "CPU amd64-v3 support: no"
+          say "CPU 支持 amd64-v3：否"
         fi
         CORE_KIND="amd64-compatible"
         ASSET="mihomo-linux-amd64-compatible-${VERSION}.gz"
       fi
       ;;
     aarch64|arm64)
-      say "CPU amd64-v3 support: not applicable for $arch"
+      say "当前架构 $arch 不适用 amd64-v3 检测"
       CORE_KIND="arm64"
       ASSET="mihomo-linux-arm64-${VERSION}.gz"
       ;;
     *)
-      die "Unsupported CPU arch: $arch"
+      die "不支持的 CPU 架构：$arch"
       ;;
   esac
-  say "Selected core: $CORE_KIND ($ASSET)"
+  say "已选择核心：$CORE_KIND（$ASSET）"
 }
 
 download_file() {
@@ -318,9 +318,9 @@ download_file() {
     )
   fi
 
-  say "Downloading $asset"
+  say "正在下载：$asset"
   download_best_url "$output" "${urls[@]}" && return 0
-  die "Download failed. You can retry with: GH_PROXY=https://your-github-proxy/ bash $0"
+  die "下载失败，可设置 GH_PROXY=<GitHub加速地址> 后重试。"
 }
 
 download_url_with_fallback() {
@@ -361,25 +361,25 @@ resolve_mihomo_version() {
         )
       fi
 
-      say "Resolving latest Mihomo version"
+      say "正在获取 Mihomo 最新版本"
       if download_best_url "$tmp" "${urls[@]}"; then
         latest="$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | head -1)"
         if [ -n "$latest" ]; then
           VERSION="$latest"
-          say "Latest Mihomo version: $VERSION"
+          say "Mihomo 最新版本：$VERSION"
         fi
       fi
 
       if [ -z "$latest" ]; then
-        say "Could not parse release metadata from selected source; trying API sources in order."
+        say "无法从已选下载源解析版本信息，按顺序尝试 API 地址。"
         for url in "${urls[@]}"; do
           [ -n "$url" ] || continue
-          say "Try release API: $url"
+          say "尝试版本 API：$url"
           fetch_url "$url" "$tmp" || continue
           latest="$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | head -1)"
           if [ -n "$latest" ]; then
             VERSION="$latest"
-            say "Latest Mihomo version: $VERSION"
+            say "Mihomo 最新版本：$VERSION"
             break
           fi
         done
@@ -388,7 +388,7 @@ resolve_mihomo_version() {
       case "$VERSION" in
         latest|auto|current)
           VERSION="$MIHOMO_FALLBACK_VERSION"
-          say "Could not resolve latest Mihomo version; fallback to $VERSION"
+          say "无法获取 Mihomo 最新版本，使用兜底版本：$VERSION"
           ;;
       esac
       ;;
@@ -403,9 +403,9 @@ import_config_from_url() {
   [ "$CONFIG_URL" != "off" ] && [ "$CONFIG_URL" != "none" ] && [ "$CONFIG_URL" != "0" ] || return 0
 
   local downloaded="$WORK_DIR/config.yaml"
-  say "Importing custom config for $profile"
-  download_url_with_fallback "$CONFIG_URL" "$downloaded" || die "Failed to download CONFIG_URL."
-  [ -s "$downloaded" ] || die "Downloaded CONFIG_URL is empty."
+  say "正在为 $profile 导入配置文件"
+  download_url_with_fallback "$CONFIG_URL" "$downloaded" || die "下载 CONFIG_URL 失败。"
+  [ -s "$downloaded" ] || die "下载的 CONFIG_URL 内容为空。"
 
   mkdir -p "$(dirname "$target")"
   backup_file "$target"
@@ -450,9 +450,9 @@ download_nexusbox_installer() {
     )
   fi
 
-  say "Downloading NexusBox installer"
+  say "正在下载 NexusBox 安装脚本"
   download_best_url "$output" "${urls[@]}" && return 0
-  die "NexusBox installer download failed. You can retry with NEXUSBOX_INSTALL_URL=<url>."
+  die "NexusBox 安装脚本下载失败，可设置 NEXUSBOX_INSTALL_URL=<地址> 后重试。"
 }
 
 nexusbox_binary_arch() {
@@ -486,15 +486,15 @@ verify_sha256() {
   local file="$1" expected="$2" actual
   [ -n "$expected" ] || return 0
   actual="$(file_sha256 "$file" || true)"
-  [ -n "$actual" ] || die "Cannot verify SHA256 because sha256sum/openssl is missing."
+  [ -n "$actual" ] || die "缺少 sha256sum/openssl，无法验证 SHA256。"
   expected="$(printf '%s' "$expected" | tr 'A-F' 'a-f')"
-  [ "$actual" = "$expected" ] || die "SHA256 mismatch for $file. expected=$expected actual=$actual"
+  [ "$actual" = "$expected" ] || die "$file 的 SHA256 不匹配，预期=$expected，实际=$actual"
 }
 
 download_patched_nexusbox_binary() {
   local output="$1" arch asset raw_url expected urls=()
   arch="$(nexusbox_binary_arch)" || {
-    say "No patched NexusBox binary for arch $(uname -m); skip patched binary."
+    say "没有适用于 $(uname -m) 的 NexusBox 修补版二进制。"
     return 1
   }
   asset="nexusbox-linux-${arch}"
@@ -527,7 +527,7 @@ download_patched_nexusbox_binary() {
     )
   fi
 
-  say "Downloading patched NexusBox binary ($arch)"
+  say "正在下载 NexusBox 修补版（$arch）"
   download_best_url "$output" "${urls[@]}" || return 1
   verify_sha256 "$output" "$expected"
   chmod 0755 "$output"
@@ -536,17 +536,17 @@ download_patched_nexusbox_binary() {
 install_patched_nexusbox_binary() {
   case "$NEXUSBOX_PATCHED_ENABLE" in
     0|false|no|off)
-      say "Patched NexusBox binary disabled by NEXUSBOX_PATCHED_ENABLE=$NEXUSBOX_PATCHED_ENABLE"
+      say "已通过 NEXUSBOX_PATCHED_ENABLE=$NEXUSBOX_PATCHED_ENABLE 关闭 NexusBox 修补版。"
       return 0
       ;;
   esac
 
   local patched="$WORK_DIR/nexusbox-patched"
-  download_patched_nexusbox_binary "$patched" || die "Patched NexusBox download failed. Set NEXUSBOX_PATCHED_ENABLE=0 only if you accept the known Mihomo reload compatibility issue."
+  download_patched_nexusbox_binary "$patched" || die "NexusBox 修补版下载失败。只有明确接受 Mihomo 热重载兼容问题时，才应设置 NEXUSBOX_PATCHED_ENABLE=0。"
   backup_file "$NEXUSBOX_BIN"
   cp "$patched" "$NEXUSBOX_BIN"
   chmod 0755 "$NEXUSBOX_BIN"
-  say "Installed patched NexusBox binary: $NEXUSBOX_BIN"
+  say "已安装 NexusBox 修补版：$NEXUSBOX_BIN"
 }
 
 patch_nexusbox_installer() {
@@ -554,7 +554,7 @@ patch_nexusbox_installer() {
   [ -f "$file" ] || return 0
 
   if grep -q '^ install_mihomo$' "$file"; then
-    sed -i '/^ install_mihomo$/c\ msg "Skip NexusBox bundled Mihomo download; pve-lxc-mihomo will install a CPU-matched core next."' "$file"
+    sed -i '/^ install_mihomo$/c\ msg "跳过 NexusBox 自带的 Mihomo 下载；随后将安装与 CPU 匹配的核心。"' "$file"
   fi
 
   if grep -q '是否立即启动 NexusBox' "$file"; then
@@ -571,14 +571,14 @@ apt_install_if_missing() {
   done
   [ "${#pkgs[@]}" -gt 0 ] || return 0
 
-  say "Installing packages: ${pkgs[*]}"
+  say "正在安装依赖：${pkgs[*]}"
   export http_proxy="${http_proxy:-}"
   export https_proxy="${https_proxy:-}"
   export HTTP_PROXY="${HTTP_PROXY:-}"
   export HTTPS_PROXY="${HTTPS_PROXY:-}"
 
   if ! apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false update; then
-    say "apt update failed without proxy. Trying normal apt update."
+    say "不使用代理执行 apt update 失败，改用当前代理环境重试。"
     apt-get update
   fi
   apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false install -y "${pkgs[@]}" || apt-get install -y "${pkgs[@]}"
@@ -596,7 +596,7 @@ prepare_core_binary() {
 
 write_rc_local_nat() {
   local iface="$1" dns_port="${2:-}" redir_port="${3:-}"
-  say "Configure rc.local NAT on interface: $iface"
+  say "正在为出口网卡 $iface 配置 rc.local NAT"
   backup_file /etc/rc.local
   cat > /etc/rc.local <<EOF
 #!/bin/sh -e
@@ -630,26 +630,26 @@ wait_for_port() {
   local port="$1" name="$2"
   for _ in $(seq 1 20); do
     if port_listening "$port"; then
-      say "Verified listening port: $name ($port)"
+      say "端口验证正常：$name（$port）"
       return 0
     fi
     sleep 1
   done
-  die "$name is not listening on port $port."
+  die "$name 未监听端口 $port。"
 }
 
 verify_dns_runtime() {
   local config_file="$1" dns_port
   dns_port="$(detect_dns_listen_port "$config_file" || true)"
   [ -n "$dns_port" ] || {
-    say "No dns.listen found in $config_file; skip DNS port verification"
+    say "$config_file 中未找到 dns.listen，跳过 DNS 端口验证"
     return 0
   }
 
-  wait_for_port "$dns_port" "Mihomo DNS"
+  wait_for_port "$dns_port" "Mihomo DNS 服务"
   if [ "$dns_port" != "53" ]; then
-    iptables -t nat -S PREROUTING 2>/dev/null | grep -Eq -- "--dport 53 .*--to-ports ${dns_port}" || die "DNS redirect 53 -> ${dns_port} is missing."
-    say "Verified DNS redirect: 53 -> ${dns_port}"
+    iptables -t nat -S PREROUTING 2>/dev/null | grep -Eq -- "--dport 53 .*--to-ports ${dns_port}" || die "缺少 DNS 转发规则 53 -> ${dns_port}。"
+    say "DNS 转发验证正常：53 -> ${dns_port}"
   fi
 }
 
@@ -657,14 +657,14 @@ verify_transparent_runtime() {
   local config_file="$1" redir_port
   redir_port="$(detect_redir_port "$config_file" || true)"
   [ -n "$redir_port" ] || {
-    say "No redir-port found in $config_file; skip transparent proxy verification"
+    say "$config_file 中未找到 redir-port，跳过透明代理验证"
     return 0
   }
 
-  wait_for_port "$redir_port" "Mihomo transparent redirect"
-  iptables -t nat -S PREROUTING 2>/dev/null | grep -q -- "-j MIHOMO_REDIRECT" || die "Transparent TCP redirect rule is missing."
-  iptables -t nat -S MIHOMO_REDIRECT 2>/dev/null | grep -Eq -- "--to-ports ${redir_port}" || die "Transparent TCP redirect target ${redir_port} is missing."
-  say "Verified transparent TCP redirect: PREROUTING -> ${redir_port}"
+  wait_for_port "$redir_port" "Mihomo TCP 透明代理"
+  iptables -t nat -S PREROUTING 2>/dev/null | grep -q -- "-j MIHOMO_REDIRECT" || die "缺少 TCP 透明代理 PREROUTING 规则。"
+  iptables -t nat -S MIHOMO_REDIRECT 2>/dev/null | grep -Eq -- "--to-ports ${redir_port}" || die "缺少 TCP 透明代理目标端口 ${redir_port}。"
+  say "TCP 透明代理验证正常：PREROUTING -> ${redir_port}"
 }
 
 reload_nexusbox_core_direct() {
@@ -677,13 +677,13 @@ reload_nexusbox_core_direct() {
     [ -S "$socket" ] && break
     sleep 1
   done
-  [ -S "$socket" ] || die "Mihomo controller socket is missing: $socket"
+  [ -S "$socket" ] || die "缺少 Mihomo 控制接口套接字：$socket"
 
   curl -fsS --unix-socket "$socket" \
     -X PUT "http://localhost/configs?force=true" \
     -H "Content-Type: application/json" \
-    -d "$body" >/dev/null || die "Mihomo config reload failed through $socket."
-  say "Verified Mihomo config reload API"
+    -d "$body" >/dev/null || die "通过 $socket 重载 Mihomo 配置失败。"
+  say "Mihomo 配置热重载接口验证正常"
 }
 
 json_string_value() {
@@ -698,12 +698,12 @@ verify_nexusbox_hot_reload_api() {
   user="$(json_string_value "$config_json" "username")"
   pass="$(json_string_value "$config_json" "password")"
   if [ -z "$user" ] || [ -z "$pass" ]; then
-    say "Cannot read NexusBox login from $config_json; skip UI hot reload verification."
+    say "无法从 $config_json 读取 NexusBox 登录信息，跳过 UI 热重载验证。"
     return 0
   fi
   case "${user}${pass}" in
     *[!A-Za-z0-9._@-]*)
-      say "NexusBox login contains special characters; skip UI hot reload verification."
+      say "NexusBox 登录信息包含特殊字符，跳过 UI 热重载验证。"
       return 0
       ;;
   esac
@@ -713,35 +713,35 @@ verify_nexusbox_hot_reload_api() {
     -H "Content-Type: application/json" \
     -d "{\"username\":\"${user}\",\"password\":\"${pass}\"}" \
     "http://127.0.0.1:18080/login" >/dev/null || {
-      say "Cannot login to NexusBox locally; skip UI hot reload verification."
+      say "无法在本机登录 NexusBox，跳过 UI 热重载验证。"
       return 0
     }
 
-  curl -fsS -b "$cookie" -X PUT "http://127.0.0.1:18080/configs" >/dev/null || die "NexusBox UI hot reload API failed. This usually means the NexusBox binary is not patched for current Mihomo."
-  say "Verified NexusBox UI hot reload API"
+  curl -fsS -b "$cookie" -X PUT "http://127.0.0.1:18080/configs" >/dev/null || die "NexusBox UI 热重载接口失败，通常表示 NexusBox 二进制未兼容当前 Mihomo。"
+  say "NexusBox UI 热重载接口验证正常"
 }
 
 verify_standalone_running() {
-  say "Verifying standalone Mihomo runtime"
+  say "正在验证纯 Mihomo 运行状态"
   if have systemctl; then
     systemctl is-active --quiet mihomo || {
       systemctl status mihomo --no-pager || true
-      die "mihomo.service is not active."
+      die "mihomo.service 未运行。"
     }
   fi
-  pgrep -f "${MIHOMO_BIN} -d ${CONFIG_DIR}" >/dev/null || die "Mihomo process was not found."
-  wait_for_port 7890 "Mihomo mixed proxy"
-  wait_for_port 9090 "Mihomo controller API"
+  pgrep -f "${MIHOMO_BIN} -d ${CONFIG_DIR}" >/dev/null || die "未找到 Mihomo 进程。"
+  wait_for_port 7890 "Mihomo HTTP/SOCKS 代理"
+  wait_for_port 9090 "Mihomo 控制接口"
   verify_dns_runtime "$CONFIG_FILE"
   verify_transparent_runtime "$CONFIG_FILE"
 }
 
 verify_nexusbox_running() {
-  say "Verifying NexusBox runtime"
-  pgrep -f "$NEXUSBOX_BIN" >/dev/null || die "NexusBox process was not found."
-  wait_for_port 18080 "NexusBox UI"
-  wait_for_port 7890 "Mihomo mixed proxy"
-  wait_for_port 9090 "Mihomo controller API"
+  say "正在验证 NexusBox 运行状态"
+  pgrep -f "$NEXUSBOX_BIN" >/dev/null || die "未找到 NexusBox 进程。"
+  wait_for_port 18080 "NexusBox 管理页面"
+  wait_for_port 7890 "Mihomo HTTP/SOCKS 代理"
+  wait_for_port 9090 "Mihomo 控制接口"
   reload_nexusbox_core_direct "${NEXUSBOX_CONFIG_DIR}/config.yaml"
   verify_nexusbox_hot_reload_api
   verify_dns_runtime "${NEXUSBOX_CONFIG_DIR}/config.yaml"
@@ -749,7 +749,7 @@ verify_nexusbox_running() {
 }
 
 install_standalone_mihomo() {
-  say "Mode: standalone Mihomo side-router"
+  say "安装模式：纯 Mihomo 旁路由"
   INSTALL_PROFILE="standalone"
   apt_install_if_missing ca-certificates gzip iproute2 iptables procps
   prepare_core_binary
@@ -789,7 +789,7 @@ rules:
   - MATCH,DIRECT
 EOF
   else
-    say "Keep existing config: $CONFIG_FILE"
+    say "保留现有配置：$CONFIG_FILE"
   fi
   import_config_from_url "$CONFIG_FILE" "standalone"
 
@@ -823,7 +823,7 @@ EOF
 }
 
 restart_nexusbox() {
-  say "Restart NexusBox"
+  say "正在重启 NexusBox"
   if have systemctl && systemctl list-unit-files | grep -q '^nexusbox\.service'; then
     systemctl restart nexusbox || true
   else
@@ -834,7 +834,7 @@ restart_nexusbox() {
 }
 
 stop_nexusbox_for_core_replace() {
-  say "Stopping NexusBox before replacing Mihomo core"
+  say "替换 Mihomo 核心前停止 NexusBox"
   if have systemctl && systemctl list-unit-files | grep -q '^nexusbox\.service'; then
     systemctl stop nexusbox || true
   fi
@@ -846,13 +846,13 @@ stop_nexusbox_for_core_replace() {
     fi
     sleep 1
   done
-  say "Mihomo core process is still present; trying to replace anyway."
+  say "Mihomo 核心进程仍然存在，将继续尝试替换。"
 }
 
 fix_nexusbox_core() {
-  say "Mode: NexusBox core auto-fix"
+  say "安装模式：自动修复 NexusBox 核心"
   INSTALL_PROFILE="nexusbox"
-  [ -x "$NEXUSBOX_BIN" ] || die "NexusBox binary not found: $NEXUSBOX_BIN"
+  [ -x "$NEXUSBOX_BIN" ] || die "找不到 NexusBox 程序：$NEXUSBOX_BIN"
   apt_install_if_missing ca-certificates curl gzip iproute2 iptables procps
   prepare_core_binary
 
@@ -876,7 +876,7 @@ fix_nexusbox_core() {
 }
 
 install_nexusbox_from_url() {
-  say "Mode: install NexusBox UI, then fix Mihomo core"
+  say "安装模式：安装 NexusBox 管理页面并修复 Mihomo 核心"
   apt_install_if_missing ca-certificates curl gzip iproute2 iptables procps
 
   local nexusbox_installer="$WORK_DIR/nexusbox-install.sh"
@@ -885,39 +885,39 @@ install_nexusbox_from_url() {
   chmod 0755 "$nexusbox_installer"
   printf '\n' | bash "$nexusbox_installer"
 
-  [ -x "$NEXUSBOX_BIN" ] || die "NexusBox installer finished, but $NEXUSBOX_BIN was not found."
+  [ -x "$NEXUSBOX_BIN" ] || die "NexusBox 安装脚本已结束，但未找到 $NEXUSBOX_BIN。"
   fix_nexusbox_core
 }
 
 print_report() {
-  say "Final report"
-  echo "CPU arch: $(uname -m)"
-  echo "Core kind: ${CORE_KIND:-unknown}"
-  echo "Install profile: ${INSTALL_PROFILE:-unknown}"
-  echo "Egress iface: $(detect_egress_iface)"
-  echo "ip_forward: $(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || true)"
+  say "安装完成报告"
+  echo "CPU 架构：$(uname -m)"
+  echo "核心类型：${CORE_KIND:-未知}"
+  echo "安装类型：${INSTALL_PROFILE:-未知}"
+  echo "出口网卡：$(detect_egress_iface)"
+  echo "IPv4 转发：$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || true)"
   echo
-  echo "NAT:"
+  echo "NAT 规则："
   iptables -t nat -S POSTROUTING 2>/dev/null || true
   echo
-  echo "Processes:"
+  echo "运行进程："
   ps -ef | grep -Ei 'nexusbox|mihomo|clash|sing-box' | grep -v grep || true
   echo
-  echo "Listening ports:"
+  echo "监听端口："
   ss -lntup 2>/dev/null | grep -E '(:7877|:7890|:7896|:7898|:9090|:1053|:6666|:18080)' || true
   echo
   if [ -d /opt/nexusbox/var ]; then
-    echo "NexusBox var:"
+    echo "NexusBox 运行目录："
     ls -la /opt/nexusbox/var
   fi
   echo
-  echo "Log file: $LOG"
+  echo "安装日志：$LOG"
 }
 
 main() {
   require_root
-  say "Mihomo router installer started"
-  say "VERSION=$VERSION MODE=$MODE"
+  say "Mihomo 旁路由安装脚本已启动"
+  say "版本=$VERSION，模式=$MODE"
 
   case "$MODE" in
     auto)
@@ -937,12 +937,12 @@ main() {
       install_standalone_mihomo
       ;;
     *)
-      die "Unknown MODE=$MODE. Use auto, nexusbox, nexusbox-install, or standalone."
+      die "未知 MODE=$MODE，请使用 auto、nexusbox、nexusbox-install 或 standalone。"
       ;;
   esac
 
   print_report
-  say "DONE"
+  say "全部完成"
 }
 
 main "$@"

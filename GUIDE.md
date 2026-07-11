@@ -1,6 +1,6 @@
 # PVE LXC Mihomo 旁路由一键安装教程
 
-适用场景：PVE LXC 容器部署 Mihomo / NexusBox 旁路由，解决核心不兼容 `amd64-v3`、国内网络下载困难、第四阶段 NAT 防火墙自启等问题。
+适用场景：PVE LXC 容器部署 Mihomo / NexusBox 旁路由，解决核心不兼容 `amd64-v3`、国内网络下载困难、NexusBox 热重载、provider 节点测速和 NAT 防火墙自启等问题。
 
 ## 典型问题
 
@@ -19,7 +19,10 @@ This program can only be run on AMD64 processors with v3 microarchitecture suppo
 
 ## 一键脚本功能
 
-脚本文件：`mihomo-router-onekey.sh`
+主要脚本：
+
+- `pve-install-cn.sh`：在 PVE 宿主机运行，中文交互完成第 1-4 阶段。
+- `install-cn.sh`：在现有 LXC 内运行，安装或修复 Mihomo / NexusBox。
 
 它会自动做这些检测和处理：
 
@@ -29,6 +32,8 @@ This program can only be run on AMD64 processors with v3 microarchitecture suppo
 - 不支持 `amd64-v3` 时安装 `mihomo-linux-amd64-compatible`。
 - 检测是否存在 `/opt/nexusbox/nexusbox`。
 - 如果存在 NexusBox：自动替换 `/opt/mihomo/mihomo` 核心并重启 NexusBox。
+- 自动安装修补版 NexusBox，兼容当前 Mihomo 热重载 API。
+- 代理页自动读取 provider 节点测速历史，显示延迟或“超时”。
 - 如果不存在 NexusBox：自动安装纯 Mihomo systemd 服务。
 - 自动测试 Mihomo 配置。
 - 自动配置 `/etc/rc.local` NAT 自启。
@@ -37,37 +42,36 @@ This program can only be run on AMD64 processors with v3 microarchitecture suppo
 - 国内网络下载：先试 GitHub 原地址，失败后试 GitHub 加速地址。
 - 所有覆盖前都会备份原文件，不批量删除文件。
 
-## 使用方法
-
-把脚本上传到 LXC 容器，或在 FinalShell 文件区拖进去，然后执行：
+## PVE 宿主机中文交互安装
 
 ```bash
-chmod +x mihomo-router-onekey.sh
-./mihomo-router-onekey.sh
+bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install-cn.sh)
 ```
 
-如果只想修复 NexusBox 核心：
+## 现有 LXC 容器内安装 / 修复
+
+自动判断已有环境：
 
 ```bash
-MODE=nexusbox ./mihomo-router-onekey.sh
+bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install-cn.sh)
 ```
 
-如果只想装纯 Mihomo 旁路由：
+只修复 NexusBox：
 
 ```bash
-MODE=standalone ./mihomo-router-onekey.sh
+MODE=nexusbox bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install-cn.sh)
 ```
 
-如果 GitHub 下载慢，可以指定你自己的加速前缀：
+只安装纯 Mihomo：
 
 ```bash
-GH_PROXY=https://gh.llkk.cc ./mihomo-router-onekey.sh
+MODE=standalone bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install-cn.sh)
 ```
 
 如果以后要指定版本：
 
 ```bash
-VERSION=v1.19.28 ./mihomo-router-onekey.sh
+VERSION=v1.19.28 bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install-cn.sh)
 ```
 
 ## 安装完成后检查
@@ -77,7 +81,7 @@ VERSION=v1.19.28 ./mihomo-router-onekey.sh
 ```bash
 cat /proc/sys/net/ipv4/ip_forward
 iptables -t nat -S POSTROUTING
-ss -lntup | grep -E '(:7890|:7898|:9090|:1053|:18080)'
+ss -lntup | grep -E '(:7877|:7890|:7896|:9090|:6666|:18080)'
 ```
 
 期望看到：
@@ -101,8 +105,8 @@ LXC_IP:9090 控制端口正常
 在主路由后台添加静态路由：
 
 ```text
-目的网络：198.18.0.0
-子网掩码：255.255.0.0
+目的网络：28.0.0.0
+子网掩码：255.0.0.0
 下一跳/网关：LXC 容器 IP，例如 192.168.1.9
 ```
 
