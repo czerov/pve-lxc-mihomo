@@ -32,6 +32,9 @@ INSTALL_PROFILE="${INSTALL_PROFILE:-unknown}"
 PREFER_CN_ACCEL="${PREFER_CN_ACCEL:-0}"
 DOWNLOAD_SPEED_LIMIT="${DOWNLOAD_SPEED_LIMIT:-1024}"
 DOWNLOAD_SPEED_TIME="${DOWNLOAD_SPEED_TIME:-30}"
+GEODATA_REPO="${GEODATA_REPO:-MetaCubeX/meta-rules-dat}"
+GEODATA_BRANCH="${GEODATA_BRANCH:-release}"
+GEODATA_MIN_BYTES="${GEODATA_MIN_BYTES:-1048576}"
 
 mkdir -p "$WORK_DIR"
 exec > >(tee -a "$LOG") 2>&1
@@ -61,6 +64,17 @@ fetch_url() {
     curl -fL --connect-timeout 20 --speed-limit "$DOWNLOAD_SPEED_LIMIT" --speed-time "$DOWNLOAD_SPEED_TIME" --retry 2 -o "$output" "$url"
   elif have wget; then
     wget -T 20 -t 2 -O "$output" "$url"
+  else
+    die "缺少 curl/wget，请先安装 curl。"
+  fi
+}
+
+fetch_geodata_url() {
+  local url="$1" output="$2"
+  if have curl; then
+    curl -fL --connect-timeout 10 --speed-limit "$DOWNLOAD_SPEED_LIMIT" --speed-time 15 --retry 1 -o "$output" "$url"
+  elif have wget; then
+    wget -T 15 -t 1 -O "$output" "$url"
   else
     die "缺少 curl/wget，请先安装 curl。"
   fi
@@ -144,6 +158,155 @@ download_best_url() {
     fi
   done
   return 1
+}
+
+download_geodata_asset() {
+  local asset="$1" output="$2" tmp release_url size url
+  local urls=()
+  tmp="${WORK_DIR}/${asset}.download"
+  release_url="https://github.com/${GEODATA_REPO}/releases/download/latest/${asset}"
+
+  urls+=(
+    "https://testingcf.jsdelivr.net/gh/${GEODATA_REPO}@${GEODATA_BRANCH}/${asset}"
+    "https://cdn.jsdelivr.net/gh/${GEODATA_REPO}@${GEODATA_BRANCH}/${asset}"
+    "https://fastly.jsdelivr.net/gh/${GEODATA_REPO}@${GEODATA_BRANCH}/${asset}"
+  )
+  [ -n "${GH_PROXY:-}" ] && urls+=("${GH_PROXY%/}/${release_url}")
+  urls+=(
+    "https://gh-proxy.com/${release_url}"
+    "$release_url"
+  )
+
+  mkdir -p "$WORK_DIR" "$(dirname "$output")"
+  for url in "${urls[@]}"; do
+    say "尝试下载 GEO 数据：$url"
+    if ! fetch_geodata_url "$url" "$tmp"; then
+      say "GEO 下载源不可用，继续尝试下一个。"
+      continue
+    fi
+    size="$(wc -c < "$tmp" 2>/dev/null || echo 0)"
+    case "$size" in
+      ''|*[!0-9]*) size=0 ;;
+    esac
+    if [ "$size" -lt "$GEODATA_MIN_BYTES" ]; then
+      say "下载内容异常：${asset} 只有 ${size} 字节，继续尝试下一个源。"
+      continue
+    fi
+    backup_file "$output"
+    mv "$tmp" "$output"
+    chmod 0644 "$output"
+    say "GEO 数据下载完成：$asset（${size} 字节）"
+    return 0
+  done
+  return 1
+}
+
+install_geodata_files() {
+  local target_dir="${1:-$NEXUSBOX_CONFIG_DIR}" refresh="${2:-0}" asset output size
+  mkdir -p "$target_dir"
+  for asset in geoip.dat geosite.dat country.mmdb; do
+    output="${target_dir}/${asset}"
+    if [ -f "$output" ]; then
+      size="$(wc -c < "$output")"
+    else
+      size=0
+    fi
+    case "$size" in
+      ''|*[!0-9]*) size=0 ;;
+    esac
+    if [ "$refresh" != "1" ] && [ "$size" -ge "$GEODATA_MIN_BYTES" ]; then
+      say "保留已有 GEO 数据：$output"
+      continue
+    fi
+    if download_geodata_asset "$asset" "$output"; then
+      continue
+    fi
+    if [ "$size" -ge "$GEODATA_MIN_BYTES" ]; then
+      say "无法更新 $asset，暂时保留已有文件。"
+      continue
+    fi
+    die "所有下载源均无法获取 $asset，且本地没有可保留的文件。"
+  done
+}
+
+setup_geodata_timer() {
+  local updater="/usr/local/sbin/nexusbox-geo-update"
+  local service="/etc/systemd/system/nexusbox-geo.service"
+  local timer="/etc/systemd/system/nexusbox-geo.timer"
+
+  backup_file "$updater"
+  cat > "$updater" <<'EOF'
+#!/usr/bin/env bash
+set -u
+
+TARGET_DIR="/opt/config"
+MIN_BYTES=1048576
+mkdir -p "$TARGET_DIR"
+
+download_one() {
+  local asset="$1" target="${TARGET_DIR}/$1" tmp="${TARGET_DIR}/.$1.download" url size
+  local release_url="https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/${asset}"
+  for url in \
+    "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/${asset}" \
+    "https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/${asset}" \
+    "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/${asset}" \
+    "https://gh-proxy.com/${release_url}" \
+    "$release_url"; do
+    echo "尝试更新 ${asset}：${url}"
+    if ! curl -fL --connect-timeout 10 --speed-limit 1024 --speed-time 20 --retry 1 -o "$tmp" "$url"; then
+      continue
+    fi
+    size="$(wc -c < "$tmp" 2>/dev/null || echo 0)"
+    case "$size" in
+      ''|*[!0-9]*) size=0 ;;
+    esac
+    if [ "$size" -ge "$MIN_BYTES" ]; then
+      mv "$tmp" "$target"
+      chmod 0644 "$target"
+      echo "${asset} 更新成功（${size} 字节）"
+      return 0
+    fi
+  done
+  echo "${asset} 更新失败，保留现有文件。" >&2
+  return 1
+}
+
+failed=0
+for asset in geoip.dat geosite.dat country.mmdb; do
+  download_one "$asset" || failed=1
+done
+exit "$failed"
+EOF
+  chmod 0755 "$updater"
+
+  backup_file "$service"
+  cat > "$service" <<EOF
+[Unit]
+Description=NexusBox GEO 数据多源更新
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=$updater
+EOF
+
+  backup_file "$timer"
+  cat > "$timer" <<'EOF'
+[Unit]
+Description=NexusBox GEO 数据每日更新
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+  systemctl daemon-reload
+  systemctl enable --now nexusbox-geo.timer >/dev/null 2>&1 || true
+  say "已启用 GEO 数据多源自动更新任务。"
 }
 
 set_yaml_scalar() {
@@ -557,8 +720,16 @@ patch_nexusbox_installer() {
     sed -i '/^ install_mihomo$/c\ msg "跳过 NexusBox 自带的 Mihomo 下载；随后将安装与 CPU 匹配的核心。"' "$file"
   fi
 
+  if grep -q '^ install_geo$' "$file"; then
+    sed -i '/^ install_geo$/c\ msg "GEO 数据已由 pve-lxc-mihomo 多源下载完成。"' "$file"
+  fi
+
+  if grep -q '^ setup_geo_timer$' "$file"; then
+    sed -i '/^ setup_geo_timer$/c\ msg "GEO 自动更新将由 pve-lxc-mihomo 配置。"' "$file"
+  fi
+
   if grep -q '是否立即启动 NexusBox' "$file"; then
-    sed -i 's/read -rp "是否立即启动 NexusBox？\[Y\/n\] " START/START="${NEXUSBOX_AUTO_START:-Y}"/' "$file"
+    sed -i 's/read -rp "是否立即启动 NexusBox？\[Y\/n\] " START/START="${NEXUSBOX_AUTO_START:-N}"/' "$file"
   fi
 }
 
@@ -864,6 +1035,8 @@ fix_nexusbox_core() {
   chmod 0755 "$NEXUSBOX_CORE"
 
   import_config_from_url "${NEXUSBOX_CONFIG_DIR}/config.yaml" "nexusbox"
+  install_geodata_files "$NEXUSBOX_CONFIG_DIR" 1
+  setup_geodata_timer
 
   "$NEXUSBOX_CORE" -v
   "$NEXUSBOX_CORE" -t -d "$NEXUSBOX_CONFIG_DIR"

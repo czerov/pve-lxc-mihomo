@@ -104,7 +104,7 @@ CT_ROOTFS_STORAGE=local bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve
 
 如果导入的配置里 `dns.listen` 不是标准 `53` 端口，例如公开默认配置使用 `0.0.0.0:6666`，脚本会自动在 LXC 内持久化 DNS 转发，把客户端访问的 `53/tcp` 和 `53/udp` 转到实际 DNS 端口，并在健康检查里验证这条规则。
 
-无代理也可以尝试一键安装。国内网络建议从 `pve-install-cn.sh` 启动，它会默认启用 `PREFER_CN_ACCEL=1`，优先使用 `gh-proxy.com` 等国内加速源，raw GitHub 只作为最后兜底。若本地网络无法访问 GitHub、jsDelivr 或几个 GitHub 加速源，安装仍可能失败，此时再使用 `LXC_PROXY=auto` 或手动指定代理。
+无代理也可以尝试一键安装。国内网络建议从 `pve-install-cn.sh` 启动，它会默认启用 `PREFER_CN_ACCEL=1`，优先使用 jsDelivr、`gh-proxy.com` 等国内可用源，raw GitHub 只作为最后兜底。Mihomo 核心、NexusBox 和 `geoip.dat` / `geosite.dat` / `country.mmdb` 都带多源回退；GEO 文件还会检查下载大小，避免把错误页面当成数据库。若所有加速源都不可用，再使用 `LXC_PROXY=auto` 或手动指定代理。
 
 `pve-install-cn.sh` 入口会优先拉取 GitHub raw / GitHub 加速源的新脚本，CDN 只作为兜底，避免 `cdn.jsdelivr.net @main` 缓存旧版脚本导致菜单或逻辑不是最新。
 
