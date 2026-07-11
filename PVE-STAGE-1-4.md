@@ -177,7 +177,7 @@ lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
 - 自动检测是否支持 `amd64-v3`，并在日志里打印架构、支持结果和缺失的 CPU flags。
 - 支持则安装 `mihomo-linux-amd64-v3`。
 - 不支持则安装 `mihomo-linux-amd64-compatible`。
-- 如果检测到 `/opt/nexusbox/nexusbox`，则修复 NexusBox 的 `/opt/mihomo/mihomo`，并替换为兼容当前 mihomo 热重载 API 的修补版 NexusBox 二进制。
+- 如果检测到 `/opt/nexusbox/nexusbox`，则修复 NexusBox 的 `/opt/mihomo/mihomo`，并替换为兼容当前 mihomo 热重载和 provider 节点测速 API 的修补版 NexusBox 二进制。
 - 如果没有 NexusBox，则安装纯 Mihomo systemd 服务。
 - 纯 Mihomo 模式不会安装 NexusBox UI，因此不会开放 `18080`。
 - 如果要从零安装 NexusBox UI，使用 `LXC_INSTALL_MODE=nexusbox-install`。默认会使用 Ladavian/NexusBox 官方安装脚本，并自动尝试 CDN / GitHub 加速源；需要时也可以自定义 `NEXUSBOX_INSTALL_URL`。

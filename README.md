@@ -30,7 +30,7 @@
 - 自动模式：已有 NexusBox 就修复核心，否则装纯 Mihomo
 - 修复已有 NexusBox 核心
 - 从零安装 NexusBox UI 后修复核心，默认使用 Ladavian/NexusBox 官方安装脚本，并自动尝试 CDN / GitHub 加速源
-- NexusBox 模式会替换为仓库内修补版 NexusBox 二进制，修复当前 mihomo `PUT /configs?force=true` 需要 `payload` 字段导致的 `Body invalid` 热重载失败
+- NexusBox 模式会替换为仓库内修补版 NexusBox 二进制，修复当前 mihomo 热重载 `Body invalid`，并让代理页正确读取 provider 节点延迟、显示测速结果或“超时”
 - LXC 代理：关闭、自动探测、手动输入
 
 如果不想交互，可以加 `INTERACTIVE=0` 并用环境变量指定。
