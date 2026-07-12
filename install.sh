@@ -62,6 +62,9 @@ prefer_cn_accel_enabled() {
     *) return 1 ;;
   esac
 }
+proxy_environment_enabled() {
+  [ -n "${http_proxy:-}${https_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}${all_proxy:-}${ALL_PROXY:-}" ]
+}
 backup_file() {
   local path="$1"
   local ts
@@ -75,8 +78,24 @@ backup_file() {
 fetch_url() {
   local url="$1" output="$2"
   if have curl; then
+    if proxy_environment_enabled; then
+      if curl -fL --connect-timeout 8 --speed-limit "$DOWNLOAD_SPEED_LIMIT" --speed-time 10 --retry 0 -o "$output" "$url"; then
+        return 0
+      fi
+      say "当前代理下载失败，改用直连重试：$url"
+      curl -fL --proxy "" --connect-timeout 20 --speed-limit "$DOWNLOAD_SPEED_LIMIT" --speed-time "$DOWNLOAD_SPEED_TIME" --retry 2 -o "$output" "$url"
+      return
+    fi
     curl -fL --connect-timeout 20 --speed-limit "$DOWNLOAD_SPEED_LIMIT" --speed-time "$DOWNLOAD_SPEED_TIME" --retry 2 -o "$output" "$url"
   elif have wget; then
+    if proxy_environment_enabled; then
+      if wget -T 10 -t 1 -O "$output" "$url"; then
+        return 0
+      fi
+      say "当前代理下载失败，改用直连重试：$url"
+      env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY -u all_proxy -u ALL_PROXY wget --no-proxy -T 20 -t 2 -O "$output" "$url"
+      return
+    fi
     wget -T 20 -t 2 -O "$output" "$url"
   else
     die "缺少 curl/wget，请先安装 curl。"
@@ -97,8 +116,24 @@ fetch_url_via_running_proxy() {
 fetch_geodata_url() {
   local url="$1" output="$2"
   if have curl; then
+    if proxy_environment_enabled; then
+      if curl -fL --connect-timeout 8 --speed-limit "$DOWNLOAD_SPEED_LIMIT" --speed-time 10 --retry 0 -o "$output" "$url"; then
+        return 0
+      fi
+      say "当前代理下载 GEO 失败，改用直连重试：$url"
+      curl -fL --proxy "" --connect-timeout 10 --speed-limit "$DOWNLOAD_SPEED_LIMIT" --speed-time 15 --retry 1 -o "$output" "$url"
+      return
+    fi
     curl -fL --connect-timeout 10 --speed-limit "$DOWNLOAD_SPEED_LIMIT" --speed-time 15 --retry 1 -o "$output" "$url"
   elif have wget; then
+    if proxy_environment_enabled; then
+      if wget -T 10 -t 1 -O "$output" "$url"; then
+        return 0
+      fi
+      say "当前代理下载 GEO 失败，改用直连重试：$url"
+      env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY -u all_proxy -u ALL_PROXY wget --no-proxy -T 15 -t 1 -O "$output" "$url"
+      return
+    fi
     wget -T 15 -t 1 -O "$output" "$url"
   else
     die "缺少 curl/wget，请先安装 curl。"
@@ -109,6 +144,9 @@ probe_download_source() {
   local url="$1" speed
   if have curl; then
     speed="$(curl -fL --range 0-65535 --connect-timeout 8 --max-time 15 -o /dev/null -w '%{speed_download}' "$url" 2>/dev/null || true)"
+    if proxy_environment_enabled && { [ -z "$speed" ] || [ "${speed%.*}" = "0" ]; }; then
+      speed="$(curl -fL --proxy "" --range 0-65535 --connect-timeout 8 --max-time 15 -o /dev/null -w '%{speed_download}' "$url" 2>/dev/null || true)"
+    fi
   elif have wget; then
     fetch_url "$url" /dev/null >/dev/null 2>&1 && speed=1 || speed=0
   else
@@ -826,6 +864,27 @@ patch_nexusbox_installer() {
   local file="$1"
   [ -f "$file" ] || return 0
 
+  if ! grep -q 'pve_lxc_mihomo_curl_fallback' "$file"; then
+    sed -i '2i\
+# pve_lxc_mihomo_curl_fallback\
+curl() {\
+  if command curl "$@"; then\
+    return 0\
+  fi\
+  if [ -n "${http_proxy:-}${https_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}${all_proxy:-}${ALL_PROXY:-}" ]; then\
+    printf "[WARN] 当前代理下载失败，改用直连重试：%s\\n" "${*: -1}" >&2\
+    command curl --proxy "" "$@"\
+    return\
+  fi\
+  return 1\
+}\
+' "$file"
+  fi
+
+  if grep -q '^ install_deps$' "$file"; then
+    sed -i '/^ install_deps$/c\ msg "依赖已由 pve-lxc-mihomo 安装，跳过重复 APT 操作。"' "$file"
+  fi
+
   if grep -q '^ install_mihomo$' "$file"; then
     sed -i '/^ install_mihomo$/c\ msg "跳过 NexusBox 自带的 Mihomo 下载；随后将安装与 CPU 匹配的核心。"' "$file"
   fi
@@ -853,6 +912,8 @@ apt_install_if_missing() {
   [ "${#pkgs[@]}" -gt 0 ] || return 0
 
   say "正在安装依赖：${pkgs[*]}"
+  export LANG=C.UTF-8
+  export LC_ALL=C.UTF-8
   export http_proxy="${http_proxy:-}"
   export https_proxy="${https_proxy:-}"
   export HTTP_PROXY="${HTTP_PROXY:-}"
@@ -1330,7 +1391,7 @@ fix_nexusbox_core() {
 
 install_nexusbox_from_url() {
   say "安装模式：安装 NexusBox 管理页面并修复 Mihomo 核心"
-  apt_install_if_missing ca-certificates curl gzip iproute2 iptables procps unzip
+  apt_install_if_missing ca-certificates curl wget gzip iproute2 iptables nftables procps unzip
 
   local nexusbox_installer="$WORK_DIR/nexusbox-install.sh"
   download_nexusbox_installer "$nexusbox_installer"
