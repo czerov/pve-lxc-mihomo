@@ -70,6 +70,17 @@ fetch_url() {
   fi
 }
 
+fetch_url_via_running_proxy() {
+  local url="$1" output="$2" proxy
+  have curl || return 1
+  for proxy in http://127.0.0.1:7890 http://127.0.0.1:7891; do
+    if curl -fL -x "$proxy" --connect-timeout 5 --max-time 15 --retry 1 -o "$output" "$url"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 fetch_geodata_url() {
   local url="$1" output="$2"
   if have curl; then
@@ -526,7 +537,15 @@ resolve_mihomo_version() {
       fi
 
       say "正在获取 Mihomo 最新版本"
-      if download_best_url "$tmp" "${urls[@]}"; then
+	  if fetch_url_via_running_proxy "$api" "$tmp"; then
+		latest="$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | head -1)"
+		if [ -n "$latest" ]; then
+		  VERSION="$latest"
+		  say "已通过当前 Mihomo 代理获取最新版本：$VERSION"
+		fi
+	  fi
+
+      if [ -z "$latest" ] && download_best_url "$tmp" "${urls[@]}"; then
         latest="$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | head -1)"
         if [ -n "$latest" ]; then
           VERSION="$latest"
