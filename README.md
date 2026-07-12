@@ -38,7 +38,7 @@ bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-ins
 默认会弹出中文交互选择；直接回车会从零安装 NexusBox，并使用 KDocs 路由模式：
 
 - 纯 Mihomo 旁路由：无 NexusBox UI，无 `18080`
-- 自动模式：已有 NexusBox 就修复核心，否则装纯 Mihomo
+- 自动模式：已有 LXC 时自动判断 NexusBox；新建 LXC 时自动安装完整 NexusBox
 - 修复已有 NexusBox 核心
 - 从零安装 NexusBox UI 后修复核心，默认使用 Ladavian/NexusBox 官方安装脚本，并自动尝试 CDN / GitHub 加速源
 - NexusBox 模式会替换为仓库内修补版 NexusBox 二进制，修复当前 mihomo 热重载 `Body invalid`，并让代理页正确读取 provider 节点延迟、显示测速结果或“超时”
@@ -107,7 +107,7 @@ CT_ROOTFS_STORAGE=local bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve
 
 KDocs 模式会停止 `systemd-resolved`，让 Mihomo 直接监听 `0.0.0.0:53`。完整网关模式使用 `0.0.0.0:6666`，并自动把客户端访问的 `53/tcp` 和 `53/udp` 转到实际 DNS 端口。
 
-无代理也可以尝试一键安装。国内网络建议从 `pve-install-cn.sh` 启动，它会默认启用 `PREFER_CN_ACCEL=1`，优先使用 jsDelivr、`gh-proxy.com` 等国内可用源，raw GitHub 只作为最后兜底。Mihomo 核心、NexusBox 和 `geoip.dat` / `geosite.dat` / `country.mmdb` 都带多源回退；GEO 文件还会检查下载大小，避免把错误页面当成数据库。若所有加速源都不可用，再使用 `LXC_PROXY=auto` 或手动指定代理。
+无代理也可以尝试一键安装。国内网络建议从 `pve-install-cn.sh` 启动，它会默认启用 `PREFER_CN_ACCEL=1`，优先使用 jsDelivr、`gh-proxy.com` 等国内可用源，raw GitHub 只作为最后兜底。Mihomo 核心、NexusBox 和 `geoip.dat` / `geosite.dat` / `country.mmdb` 都带多源回退；GEO 文件还会检查下载大小，避免把错误页面当成数据库。若选择自动或手动 LXC 代理，APT 和后续下载会优先使用该代理，代理失败才回退直连。
 
 `pve-install-cn.sh` 入口会优先拉取 GitHub raw / GitHub 加速源的新脚本，CDN 只作为兜底，避免 `cdn.jsdelivr.net @main` 缓存旧版脚本导致菜单或逻辑不是最新。
 

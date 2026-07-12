@@ -199,11 +199,20 @@ is_interactive() {
   [ "$INTERACTIVE" != "0" ] && [ "$INTERACTIVE" != "false" ] && [ -t 0 ]
 }
 
+normalize_new_lxc_install_mode() {
+  if [ "$USE_EXISTING" != "1" ] && [ "$LXC_INSTALL_MODE" = "auto" ]; then
+    LXC_INSTALL_MODE="nexusbox-install"
+    NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-$NEXUSBOX_DEFAULT_INSTALL_URL}"
+    say "新建 LXC 不存在 NexusBox，自动模式已切换为完整 NexusBox 安装。"
+  fi
+}
+
 prompt_choices() {
   if ! is_interactive; then
     if [ "$LXC_INSTALL_MODE_WAS_SET" = "0" ] && [ "$LXC_INSTALL_MODE" = "auto" ]; then
       LXC_INSTALL_MODE="nexusbox-install"
     fi
+    normalize_new_lxc_install_mode
     return 0
   fi
 
@@ -211,7 +220,7 @@ prompt_choices() {
     echo
     echo "安装模式："
     echo "  1) 纯 Mihomo 旁路由（不安装 NexusBox UI / 不开放 18080）"
-    echo "  2) 自动判断：已有 NexusBox 就修复核心，否则安装纯 Mihomo"
+    echo "  2) 自动判断：已有 NexusBox 就修复；新建 LXC 自动安装完整 NexusBox"
     echo "  3) 只修复已有 NexusBox 的 Mihomo 核心"
     echo "  4) 新建/准备 LXC 后，从安装脚本安装 NexusBox UI，再自动安装适配的 Mihomo 核心"
     printf "请选择 [1-4，默认 4]: "
@@ -231,6 +240,8 @@ prompt_choices() {
       *) die "无效安装模式选择: $install_choice" ;;
     esac
   fi
+
+  normalize_new_lxc_install_mode
 
   if [ "$ROUTING_MODE_WAS_SET" = "0" ]; then
     echo

@@ -845,11 +845,22 @@ apt_install_if_missing() {
   export HTTP_PROXY="${HTTP_PROXY:-}"
   export HTTPS_PROXY="${HTTPS_PROXY:-}"
 
-  if ! apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false update; then
-    say "不使用代理执行 apt update 失败，改用当前代理环境重试。"
-    apt-get update
+  if [ -n "${http_proxy}${https_proxy}${HTTP_PROXY}${HTTPS_PROXY}" ] ||
+    grep -Eq 'Acquire::(http|https)::Proxy' /etc/apt/apt.conf.d/99proxy 2>/dev/null; then
+    say "检测到安装代理，APT 优先使用当前代理"
+    if ! apt-get update; then
+      say "APT 代理更新失败，改用直连重试。"
+      apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false update
+    fi
+    if ! apt-get install -y "${pkgs[@]}"; then
+      say "APT 代理安装失败，改用直连重试。"
+      apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false install -y "${pkgs[@]}"
+    fi
+    return 0
   fi
-  apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false install -y "${pkgs[@]}" || apt-get install -y "${pkgs[@]}"
+
+  apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false update
+  apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false install -y "${pkgs[@]}"
 }
 
 prepare_core_binary() {
