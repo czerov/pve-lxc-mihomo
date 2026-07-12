@@ -19,6 +19,7 @@
 - 日志页会加载 NexusBox 历史运行日志，同时继续接收 Mihomo 实时日志，默认显示 DEBUG 及以上级别。
 - 单条订阅可启用“通过节点选择更新”，由已可用的代理节点访问受限订阅地址，避免给第一订阅造成循环依赖。
 - 配置页在 NexusBox 或 Mihomo 刚重启时自动重试配置和 YAML 加载，不再依赖手动刷新。
+- 节点测速设置 25 秒上限，结束后强制清除“测速中”状态，并显示正常、超时和总节点数汇总。
 
 构建命令：
 
@@ -34,6 +35,6 @@ GOOS=linux GOARCH=arm64 go build -tags vue -ldflags="-s -w" -o nexusbox-linux-ar
 SHA256：
 
 ```text
-amd64  51243c791e6b3ec277244e836cf494a29b3b93b94377631b971ee3f96737ddd2
-arm64  cfad3e4393894a8739b5dadc48a3ab4379021b5f7b2d76139d35a7ce30617b2a
+amd64  24e726dbb12cffd3bf49ea487c1a05da9207de57120347161abb9c9bb877c449
+arm64  1aac5dba4dce74736c5c0ceae71f7f8c5fca17fafb0756461405d2bb4dea1ff2
 ```

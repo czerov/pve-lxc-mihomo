@@ -629,8 +629,8 @@ nexusbox_binary_arch() {
 
 nexusbox_expected_sha256() {
   case "$1" in
-    amd64) echo "51243c791e6b3ec277244e836cf494a29b3b93b94377631b971ee3f96737ddd2" ;;
-    arm64) echo "cfad3e4393894a8739b5dadc48a3ab4379021b5f7b2d76139d35a7ce30617b2a" ;;
+    amd64) echo "24e726dbb12cffd3bf49ea487c1a05da9207de57120347161abb9c9bb877c449" ;;
+    arm64) echo "1aac5dba4dce74736c5c0ceae71f7f8c5fca17fafb0756461405d2bb4dea1ff2" ;;
     *) return 1 ;;
   esac
 }
