@@ -209,6 +209,18 @@ rules:
   - DST-PORT,123,DIRECT
   - RULE-SET,Private-IP,DIRECT
   - RULE-SET,Private-Domain,DIRECT
+
+  # 115网盘、登录、下载及关联CDN强制直连
+  - DOMAIN,fhnfile.oss-cn-shenzhen.aliyuncs.com,DIRECT
+  - DOMAIN-SUFFIX,115.com,DIRECT
+  - DOMAIN-SUFFIX,115cdn.com,DIRECT
+  - DOMAIN-SUFFIX,115cdn.net,DIRECT
+  - DOMAIN-SUFFIX,115img.com,DIRECT
+  - DOMAIN-SUFFIX,116cd.cn,DIRECT
+  - DOMAIN-SUFFIX,116cd.com,DIRECT
+  - DOMAIN-SUFFIX,116cd.net,DIRECT
+  - DOMAIN-SUFFIX,anxia.com,DIRECT
+  - DOMAIN-SUFFIX,sq.cc,DIRECT
  
   # 自定义代理
   - DOMAIN-SUFFIX,test-ipv6.com,全球直连
