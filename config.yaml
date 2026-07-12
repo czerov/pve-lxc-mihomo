@@ -257,7 +257,17 @@ rules:
   #  - RULE-SET,Foreign,节点选择
   - RULE-SET,ForeignSpeedtest,网络测试
   
-  #PT站点规则补全
+  # 指定 PT 站点强制直连，必须放在通用 PT 规则之前
+  - DOMAIN-SUFFIX,agsvpt.com,DIRECT
+  - DOMAIN-SUFFIX,m-team.cc,DIRECT
+  - DOMAIN-SUFFIX,ultrahd.net,DIRECT
+  - DOMAIN-SUFFIX,pandapt.net,DIRECT
+  - DOMAIN-SUFFIX,pterclub.net,DIRECT
+  - DOMAIN-SUFFIX,ptchdbits.co,DIRECT
+  - DOMAIN-SUFFIX,totheglory.im,DIRECT
+  - DOMAIN-SUFFIX,audiences.me,DIRECT
+
+  # PT站点规则补全
   - RULE-SET,PT,PT站点
   - DOMAIN-SUFFIX,hhanclub.net,PT站点
   - DOMAIN-SUFFIX,azusa.wiki,PT站点
