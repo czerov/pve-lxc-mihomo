@@ -15,6 +15,8 @@
 - `DIRECT` 使用国内可达的 `https://connect.rom.miui.com/generate_204`；机场节点使用 HTTPS gstatic 测速地址。
 - 融合模式每次保存都会同步全部订阅到 `proxy-providers`，修复添加第二条及后续订阅只显示在列表、没有进入 Mihomo 配置的问题。
 - 修改或删除订阅时同步更新对应 provider，同时保留 raw YAML 中非 NexusBox 管理的自定义 provider。
+- 订阅更新失败时检查 Mihomo 返回状态和节点数量，并在订阅卡片显示明确错误，不再长期停留在“流量信息不可用”。
+- 日志页会加载 NexusBox 历史运行日志，同时继续接收 Mihomo 实时日志，默认显示 DEBUG 及以上级别。
 
 构建命令：
 
@@ -30,6 +32,6 @@ GOOS=linux GOARCH=arm64 go build -tags vue -ldflags="-s -w" -o nexusbox-linux-ar
 SHA256：
 
 ```text
-amd64  9427de7c5cacfe5518d3d4252bb72031501c3ae153fa66d7ae426dda6a20909d
-arm64  8497a48f0824111ed1acfcf6c7124f73cbb20018c7e73dbba6980715ccf0af37
+amd64  f2f14b37d4e050ff5b379e642699666b808de007759090187feecf35cf4ffe05
+arm64  b94089164998afde4170cbd0959a419915cf97856812389b02364cf97cd113e7
 ```
