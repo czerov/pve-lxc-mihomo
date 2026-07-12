@@ -117,7 +117,8 @@ dns:
   enable: true
   # 默认端口也不能修改
   listen: 0.0.0.0:6666
-  ipv6: true
+  # 当前一键脚本只配置 IPv4 透明代理，禁止向客户端返回 AAAA，避免手机 IPv6 绕过旁路由。
+  ipv6: false
   enhanced-mode: fake-ip
   respect-rules: true
   # 这个也不能修改和mosdns联动的

@@ -66,11 +66,23 @@ function print_youtube_dns() {
   print "      - \"https://1.1.1.1/dns-query#节点选择\""
 }
 BEGIN {
+  in_dns = 0
   in_policy = 0
   dns_written = (add_dns == 0)
   group_written = (add_group == 0)
 }
 {
+  if ($0 ~ /^dns:[[:space:]]*$/) {
+    in_dns = 1
+  } else if (in_dns && $0 ~ /^[^[:space:]#]/) {
+    in_dns = 0
+  }
+
+  if (in_dns && $0 ~ /^  ipv6:[[:space:]]*/) {
+    print "  ipv6: false"
+    next
+  }
+
   if ($0 ~ /^  nameserver-policy:[[:space:]]*$/) {
     in_policy = 1
   } else if (in_policy && $0 ~ /^[^[:space:]#]/) {
@@ -126,7 +138,9 @@ curl -fsS --unix-socket "$CORE_SOCKET" \
   -X POST 'http://localhost/cache/dns/flush' >/dev/null
 curl -fsS --unix-socket "$CORE_SOCKET" \
   -X POST 'http://localhost/cache/fakeip/flush' >/dev/null
+curl -fsS --unix-socket "$CORE_SOCKET" \
+  -X DELETE 'http://localhost/connections' >/dev/null
 
 trap - ERR
-say "YouTube 自动测速和境外 DNS 已生效。"
+say "YouTube 自动测速、境外 DNS 和手机 IPv4 优先策略已生效。"
 say "请完全关闭手机 YouTube 后重新打开；必要时断开并重新连接 Wi-Fi。"
