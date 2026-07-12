@@ -30,12 +30,14 @@ NEXUSBOX_PATCHED_URL="${NEXUSBOX_PATCHED_URL:-}"
 NEXUSBOX_PATCHED_SHA256="${NEXUSBOX_PATCHED_SHA256:-}"
 MODE="${MODE:-auto}"
 INSTALL_PROFILE="${INSTALL_PROFILE:-unknown}"
+ROUTING_MODE="${ROUTING_MODE:-kdocs}"
 PREFER_CN_ACCEL="${PREFER_CN_ACCEL:-0}"
 DOWNLOAD_SPEED_LIMIT="${DOWNLOAD_SPEED_LIMIT:-1024}"
 DOWNLOAD_SPEED_TIME="${DOWNLOAD_SPEED_TIME:-30}"
 GEODATA_REPO="${GEODATA_REPO:-MetaCubeX/meta-rules-dat}"
 GEODATA_BRANCH="${GEODATA_BRANCH:-release}"
 GEODATA_MIN_BYTES="${GEODATA_MIN_BYTES:-1048576}"
+ZASHBOARD_URL="${ZASHBOARD_URL:-https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip}"
 
 mkdir -p "$WORK_DIR"
 exec > >(tee -a "$LOG") 2>&1
@@ -43,6 +45,16 @@ exec > >(tee -a "$LOG") 2>&1
 say() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
 die() { say "错误：$*"; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
+routing_mode_is_kdocs() {
+  [ "$ROUTING_MODE" = "kdocs" ]
+}
+
+validate_routing_mode() {
+  case "$ROUTING_MODE" in
+    kdocs|gateway) ;;
+    *) die "未知 ROUTING_MODE=$ROUTING_MODE，请使用 kdocs 或 gateway。" ;;
+  esac
+}
 prefer_cn_accel_enabled() {
   case "$PREFER_CN_ACCEL" in
     1|true|yes|on|cn) return 0 ;;
@@ -330,6 +342,67 @@ set_yaml_scalar() {
   fi
 }
 
+set_yaml_section_scalar() {
+  local file="$1" section="$2" key="$3" value="$4" tmp
+  if ! grep -q "^${section}:[[:space:]]*$" "$file"; then
+    printf '\n%s:\n  %s: %s\n' "$section" "$key" "$value" >> "$file"
+    return 0
+  fi
+  tmp="${file}.tmp.$$"
+  awk -v section="$section" -v key="$key" -v value="$value" '
+    $0 ~ "^" section ":[[:space:]]*$" {
+      in_section=1
+      print
+      next
+    }
+    in_section && /^[^[:space:]#]/ {
+      if (!written) {
+        print "  " key ": " value
+        written=1
+      }
+      in_section=0
+    }
+    in_section && $0 ~ "^[[:space:]]+" key ":[[:space:]]*" {
+      print "  " key ": " value
+      written=1
+      next
+    }
+    { print }
+    END {
+      if (in_section && !written) {
+        print "  " key ": " value
+      }
+    }
+  ' "$file" > "$tmp"
+  mv "$tmp" "$file"
+}
+
+apply_routing_profile_to_config() {
+  local file="$1" profile="${2:-}"
+  if routing_mode_is_kdocs; then
+    set_yaml_section_scalar "$file" "tun" "enable" "true"
+    set_yaml_section_scalar "$file" "tun" "stack" "gvisor"
+    set_yaml_section_scalar "$file" "tun" "device" "Meta"
+    set_yaml_section_scalar "$file" "tun" "auto-route" "true"
+    set_yaml_section_scalar "$file" "tun" "auto-detect-interface" "true"
+    set_yaml_section_scalar "$file" "tun" "strict-route" "true"
+    set_yaml_section_scalar "$file" "dns" "listen" "0.0.0.0:53"
+    set_yaml_section_scalar "$file" "dns" "ipv6" "false"
+    set_yaml_section_scalar "$file" "dns" "enhanced-mode" "fake-ip"
+    set_yaml_section_scalar "$file" "dns" "fake-ip-range" "198.18.0.1/16"
+    [ "$profile" != "nexusbox" ] || set_yaml_scalar "$file" "external-ui" "ui/zash"
+    say "已应用 KDocs 路由配置：DNS 53，Fake-IP 198.18.0.0/16。"
+  else
+    set_yaml_section_scalar "$file" "tun" "enable" "false"
+    set_yaml_section_scalar "$file" "dns" "listen" "0.0.0.0:6666"
+    set_yaml_section_scalar "$file" "dns" "ipv6" "false"
+    set_yaml_section_scalar "$file" "dns" "enhanced-mode" "fake-ip"
+    set_yaml_section_scalar "$file" "dns" "fake-ip-range" "28.0.0.1/8"
+    [ "$profile" != "nexusbox" ] || set_yaml_scalar "$file" "external-ui" "ui/meta"
+    say "已应用网关兼容配置：DNS 6666，Fake-IP 28.0.0.0/8。"
+  fi
+}
+
 set_json_string_field() {
   local file="$1" key="$2" value="$3"
   [ -f "$file" ] || return 0
@@ -358,6 +431,11 @@ set_nexusbox_merge_mode() {
   backup_file "$file"
   set_json_string_field "$file" "mode" "merge"
   set_json_string_field "$file" "rule_group" "full"
+  if routing_mode_is_kdocs; then
+    set_json_string_field "$file" "ui_panel" "zashboard"
+  else
+    set_json_string_field "$file" "ui_panel" "meta"
+  fi
   say "NexusBox 订阅模式已设置为融合，机场订阅只提供节点。"
 }
 
@@ -599,7 +677,6 @@ import_config_from_url() {
   set_yaml_scalar "$target" "external-controller" "'0.0.0.0:9090'"
   if [ "$profile" = "nexusbox" ]; then
     set_yaml_scalar "$target" "external-controller-unix" "'/opt/nexusbox/var/core.sock'"
-    set_yaml_scalar "$target" "external-ui" "ui/meta"
     set_nexusbox_merge_mode
   fi
 }
@@ -785,10 +862,129 @@ prepare_core_binary() {
   "$WORK_DIR/mihomo" -v
 }
 
+configure_forwarding_sysctl() {
+  say "正在配置网络转发"
+  backup_file /etc/sysctl.d/99-forward.conf
+  if routing_mode_is_kdocs; then
+    cat > /etc/sysctl.d/99-forward.conf <<'EOF'
+net.ipv4.ip_forward = 1
+net.ipv6.conf.all.forwarding = 1
+net.ipv6.conf.all.accept_ra = 2
+net.ipv6.conf.default.accept_ra = 2
+EOF
+  else
+    cat > /etc/sysctl.d/99-forward.conf <<'EOF'
+net.ipv4.ip_forward = 1
+EOF
+  fi
+  sysctl -p /etc/sysctl.d/99-forward.conf >/dev/null || die "应用 /etc/sysctl.d/99-forward.conf 失败。"
+}
+
+prepare_kdocs_dns_port() {
+  routing_mode_is_kdocs || return 0
+  if have systemctl; then
+    systemctl disable --now systemd-resolved >/dev/null 2>&1 || true
+  fi
+  if [ -L /etc/resolv.conf ] && readlink /etc/resolv.conf | grep -q 'systemd/resolve'; then
+    backup_file /etc/resolv.conf
+    rm -f /etc/resolv.conf
+    cat > /etc/resolv.conf <<'EOF'
+nameserver 223.5.5.5
+nameserver 119.29.29.29
+EOF
+  fi
+  if ss -lntup 2>/dev/null | grep -Eq '[:.]53[[:space:]]'; then
+    say "检测到 53 端口仍被占用："
+    ss -lntup 2>/dev/null | grep -E '[:.]53[[:space:]]' || true
+    die "KDocs 模式要求 Mihomo 直接监听 53，请先停止占用进程。"
+  fi
+}
+
+install_zashboard_ui() {
+  local ui_dir="${NEXUSBOX_CONFIG_DIR}/ui/zash"
+  local archive="$WORK_DIR/zashboard-dist.zip"
+  local extract_dir="$WORK_DIR/zashboard-extract"
+  local urls=()
+  routing_mode_is_kdocs || return 0
+
+  apt_install_if_missing unzip
+  if prefer_cn_accel_enabled; then
+    urls+=(
+      "https://gh-proxy.com/${ZASHBOARD_URL}"
+      "https://gh.llkk.cc/${ZASHBOARD_URL}"
+      "https://mirror.ghproxy.com/${ZASHBOARD_URL}"
+      "$ZASHBOARD_URL"
+    )
+  else
+    urls+=(
+      "$ZASHBOARD_URL"
+      "https://gh.llkk.cc/${ZASHBOARD_URL}"
+      "https://gh-proxy.com/${ZASHBOARD_URL}"
+      "https://mirror.ghproxy.com/${ZASHBOARD_URL}"
+    )
+  fi
+
+  say "正在下载 Zashboard 面板"
+  download_best_url "$archive" "${urls[@]}" || die "Zashboard 下载失败。"
+  mkdir -p "$ui_dir" "$extract_dir"
+  unzip -oq "$archive" -d "$extract_dir"
+  if [ -s "$extract_dir/dist/index.html" ]; then
+    cp -a "$extract_dir/dist/." "$ui_dir/"
+  elif [ -s "$extract_dir/index.html" ]; then
+    cp -a "$extract_dir/." "$ui_dir/"
+  else
+    die "Zashboard 压缩包中未找到 index.html。"
+  fi
+  [ -s "$ui_dir/index.html" ] || die "Zashboard 解压后缺少 $ui_dir/index.html。"
+  say "Zashboard 已安装：$ui_dir"
+}
+
+cleanup_gateway_redirect_rules() {
+  local proto port
+  while iptables -t nat -C PREROUTING -p tcp -j MIHOMO_REDIRECT 2>/dev/null; do
+    iptables -t nat -D PREROUTING -p tcp -j MIHOMO_REDIRECT
+  done
+  iptables -t nat -F MIHOMO_REDIRECT 2>/dev/null || true
+  iptables -t nat -X MIHOMO_REDIRECT 2>/dev/null || true
+  for proto in tcp udp; do
+    for port in 1053 6666; do
+      while iptables -t nat -C PREROUTING -p "$proto" --dport 53 -j REDIRECT --to-ports "$port" 2>/dev/null; do
+        iptables -t nat -D PREROUTING -p "$proto" --dport 53 -j REDIRECT --to-ports "$port"
+      done
+    done
+  done
+}
+
 write_rc_local_nat() {
   local iface="$1" dns_port="${2:-}" redir_port="${3:-}"
   say "正在为出口网卡 $iface 配置 rc.local NAT"
   backup_file /etc/rc.local
+  if routing_mode_is_kdocs; then
+    cleanup_gateway_redirect_rules
+    cat > /etc/rc.local <<EOF
+#!/bin/sh -e
+echo 1 >/proc/sys/net/ipv4/ip_forward
+[ ! -e /proc/sys/net/ipv6/conf/all/forwarding ] || echo 1 >/proc/sys/net/ipv6/conf/all/forwarding
+iptables -t nat -C POSTROUTING -o ${iface} -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o ${iface} -j MASQUERADE
+while iptables -t nat -C PREROUTING -p tcp -j MIHOMO_REDIRECT 2>/dev/null; do
+  iptables -t nat -D PREROUTING -p tcp -j MIHOMO_REDIRECT
+done
+iptables -t nat -F MIHOMO_REDIRECT 2>/dev/null || true
+iptables -t nat -X MIHOMO_REDIRECT 2>/dev/null || true
+for proto in tcp udp; do
+  for port in 1053 6666; do
+    while iptables -t nat -C PREROUTING -p "\$proto" --dport 53 -j REDIRECT --to-ports "\$port" 2>/dev/null; do
+      iptables -t nat -D PREROUTING -p "\$proto" --dport 53 -j REDIRECT --to-ports "\$port"
+    done
+  done
+done
+exit 0
+EOF
+    chmod +x /etc/rc.local
+    /etc/rc.local
+    return 0
+  fi
+
   cat > /etc/rc.local <<EOF
 #!/bin/sh -e
 echo 1 >/proc/sys/net/ipv4/ip_forward
@@ -838,14 +1034,40 @@ verify_dns_runtime() {
   }
 
   wait_for_port "$dns_port" "Mihomo DNS 服务"
+  if routing_mode_is_kdocs && [ "$dns_port" != "53" ]; then
+    die "KDocs 模式要求 DNS 监听 53，当前为 $dns_port。"
+  fi
   if [ "$dns_port" != "53" ]; then
     iptables -t nat -S PREROUTING 2>/dev/null | grep -Eq -- "--dport 53 .*--to-ports ${dns_port}" || die "缺少 DNS 转发规则 53 -> ${dns_port}。"
     say "DNS 转发验证正常：53 -> ${dns_port}"
   fi
 }
 
+verify_forwarding_runtime() {
+  [ "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo 0)" = "1" ] ||
+    die "IPv4 转发未开启。"
+  if routing_mode_is_kdocs && [ -e /proc/sys/net/ipv6/conf/all/forwarding ]; then
+    [ "$(cat /proc/sys/net/ipv6/conf/all/forwarding 2>/dev/null || echo 0)" = "1" ] ||
+      die "IPv6 转发未开启。"
+  fi
+  iptables -t nat -S POSTROUTING 2>/dev/null | grep -q -- '-j MASQUERADE' ||
+    die "缺少 NAT MASQUERADE 规则。"
+  say "IPv4/IPv6 转发和 NAT 验证正常。"
+}
+
+verify_tun_runtime() {
+  routing_mode_is_kdocs || return 0
+  [ -c /dev/net/tun ] || die "缺少 /dev/net/tun。"
+  ip link show Meta >/dev/null 2>&1 || die "KDocs 模式未创建 Meta TUN 网卡。"
+  say "KDocs TUN 网卡验证正常：Meta"
+}
+
 verify_transparent_runtime() {
   local config_file="$1" redir_port
+  if routing_mode_is_kdocs; then
+    say "KDocs 模式不启用 TCP REDIRECT，跳过透明代理链验证。"
+    return 0
+  fi
   redir_port="$(detect_redir_port "$config_file" || true)"
   [ -n "$redir_port" ] || {
     say "$config_file 中未找到 redir-port，跳过透明代理验证"
@@ -925,6 +1147,8 @@ verify_standalone_running() {
   wait_for_port 9090 "Mihomo 控制接口"
   verify_dns_runtime "$CONFIG_FILE"
   verify_transparent_runtime "$CONFIG_FILE"
+  verify_forwarding_runtime
+  verify_tun_runtime
 }
 
 verify_nexusbox_running() {
@@ -937,12 +1161,15 @@ verify_nexusbox_running() {
   verify_nexusbox_hot_reload_api
   verify_dns_runtime "${NEXUSBOX_CONFIG_DIR}/config.yaml"
   verify_transparent_runtime "${NEXUSBOX_CONFIG_DIR}/config.yaml"
+  verify_forwarding_runtime
+  verify_tun_runtime
 }
 
 install_standalone_mihomo() {
   say "安装模式：纯 Mihomo 旁路由"
   INSTALL_PROFILE="standalone"
   apt_install_if_missing ca-certificates gzip iproute2 iptables procps
+  configure_forwarding_sysctl
   prepare_core_binary
 
   mkdir -p "$(dirname "$MIHOMO_BIN")" "$CONFIG_DIR"
@@ -983,6 +1210,9 @@ EOF
     say "保留现有配置：$CONFIG_FILE"
   fi
   import_config_from_url "$CONFIG_FILE" "standalone"
+  apply_routing_profile_to_config "$CONFIG_FILE" "standalone"
+  systemctl stop mihomo >/dev/null 2>&1 || true
+  prepare_kdocs_dns_port
 
   "$MIHOMO_BIN" -t -d "$CONFIG_DIR"
 
@@ -1044,7 +1274,8 @@ fix_nexusbox_core() {
   say "安装模式：自动修复 NexusBox 核心"
   INSTALL_PROFILE="nexusbox"
   [ -x "$NEXUSBOX_BIN" ] || die "找不到 NexusBox 程序：$NEXUSBOX_BIN"
-  apt_install_if_missing ca-certificates curl gzip iproute2 iptables procps
+  apt_install_if_missing ca-certificates curl gzip iproute2 iptables procps unzip
+  configure_forwarding_sysctl
   prepare_core_binary
 
   mkdir -p "$(dirname "$NEXUSBOX_CORE")" /opt/nexusbox/var
@@ -1055,8 +1286,11 @@ fix_nexusbox_core() {
   chmod 0755 "$NEXUSBOX_CORE"
 
   import_config_from_url "${NEXUSBOX_CONFIG_DIR}/config.yaml" "nexusbox"
+  apply_routing_profile_to_config "${NEXUSBOX_CONFIG_DIR}/config.yaml" "nexusbox"
+  install_zashboard_ui
   install_geodata_files "$NEXUSBOX_CONFIG_DIR" 1
   setup_geodata_timer
+  prepare_kdocs_dns_port
 
   "$NEXUSBOX_CORE" -v
   "$NEXUSBOX_CORE" -t -d "$NEXUSBOX_CONFIG_DIR"
@@ -1070,7 +1304,7 @@ fix_nexusbox_core() {
 
 install_nexusbox_from_url() {
   say "安装模式：安装 NexusBox 管理页面并修复 Mihomo 核心"
-  apt_install_if_missing ca-certificates curl gzip iproute2 iptables procps
+  apt_install_if_missing ca-certificates curl gzip iproute2 iptables procps unzip
 
   local nexusbox_installer="$WORK_DIR/nexusbox-install.sh"
   download_nexusbox_installer "$nexusbox_installer"
@@ -1087,8 +1321,10 @@ print_report() {
   echo "CPU 架构：$(uname -m)"
   echo "核心类型：${CORE_KIND:-未知}"
   echo "安装类型：${INSTALL_PROFILE:-未知}"
+  echo "路由模式：$ROUTING_MODE"
   echo "出口网卡：$(detect_egress_iface)"
   echo "IPv4 转发：$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || true)"
+  echo "IPv6 转发：$(cat /proc/sys/net/ipv6/conf/all/forwarding 2>/dev/null || true)"
   echo
   echo "NAT 规则："
   iptables -t nat -S POSTROUTING 2>/dev/null || true
@@ -1097,7 +1333,7 @@ print_report() {
   ps -ef | grep -Ei 'nexusbox|mihomo|clash|sing-box' | grep -v grep || true
   echo
   echo "监听端口："
-  ss -lntup 2>/dev/null | grep -E '(:7877|:7890|:7896|:7898|:9090|:1053|:6666|:18080)' || true
+  ss -lntup 2>/dev/null | grep -E '(:53|:7877|:7890|:7896|:7898|:9090|:1053|:6666|:18080)' || true
   echo
   if [ -d /opt/nexusbox/var ]; then
     echo "NexusBox 运行目录："
@@ -1109,8 +1345,9 @@ print_report() {
 
 main() {
   require_root
+  validate_routing_mode
   say "Mihomo 旁路由安装脚本已启动"
-  say "版本=$VERSION，模式=$MODE"
+  say "版本=$VERSION，模式=$MODE，路由模式=$ROUTING_MODE"
 
   case "$MODE" in
     auto)

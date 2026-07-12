@@ -155,6 +155,13 @@ lxc.cgroup2.devices.allow: c 10:200 rwm
 lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
 ```
 
+容器内安装阶段还会自动：
+
+- 写入 /etc/sysctl.d/99-forward.conf。
+- 开启 IPv4/IPv6 转发和 IPv6 RA。
+- 停止占用 53 端口的 systemd-resolved。
+- 下载 Zashboard 官方完整字体包到 /opt/config/ui/zash。
+
 ## 第 3 阶段：容器内安装 / 修复核心
 
 脚本会：
@@ -172,9 +179,9 @@ lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
 - 支持则安装 `mihomo-linux-amd64-v3`。
 - 不支持则安装 `mihomo-linux-amd64-compatible`。
 - 如果检测到 `/opt/nexusbox/nexusbox`，则修复 NexusBox 的 `/opt/mihomo/mihomo`，并替换为兼容当前 mihomo 热重载和 provider 节点测速 API 的修补版 NexusBox 二进制。
-- 如果没有 NexusBox，则安装纯 Mihomo systemd 服务。
-- 纯 Mihomo 模式不会安装 NexusBox UI，因此不会开放 `18080`。
-- 如果要从零安装 NexusBox UI，使用 `LXC_INSTALL_MODE=nexusbox-install`。默认会使用 Ladavian/NexusBox 官方安装脚本，并自动尝试 CDN / GitHub 加速源；需要时也可以自定义 `NEXUSBOX_INSTALL_URL`。
+- 新建 LXC 默认使用 Ladavian/NexusBox 官方脚本从零安装 NexusBox，并自动尝试 CDN / GitHub 加速源。
+- 安装后替换为兼容当前 Mihomo 的修补版 NexusBox。
+- 可用 LXC_INSTALL_MODE=standalone 显式选择纯 Mihomo。
 - 脚本会验证进程、服务、端口、mihomo 配置热重载、`ip_forward` 和 NAT 规则；验证失败会直接报错，不打印成功。
 
 ## 第 4 阶段：LXC 内防火墙 / NAT 自启
@@ -183,10 +190,11 @@ lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
 
 - 自动检测出口网卡，例如 `eth0`。
 - 安装缺失的 `iptables`。
-- 开启 IPv4 转发：
+- 开启 IPv4/IPv6 转发：
 
 ```bash
 echo 1 >/proc/sys/net/ipv4/ip_forward
+echo 1 >/proc/sys/net/ipv6/conf/all/forwarding
 ```
 
 - 备份并写入 `/etc/rc.local`：
@@ -195,11 +203,6 @@ echo 1 >/proc/sys/net/ipv4/ip_forward
 #!/bin/sh -e
 echo 1 >/proc/sys/net/ipv4/ip_forward
 iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-iptables -t nat -N MIHOMO_REDIRECT 2>/dev/null || true
-iptables -t nat -F MIHOMO_REDIRECT
-iptables -t nat -A MIHOMO_REDIRECT -d 192.168.0.0/16 -j RETURN
-iptables -t nat -A MIHOMO_REDIRECT -p tcp -j REDIRECT --to-ports 7877
-iptables -t nat -C PREROUTING -p tcp -j MIHOMO_REDIRECT 2>/dev/null || iptables -t nat -A PREROUTING -p tcp -j MIHOMO_REDIRECT
 exit 0
 ```
 
@@ -210,10 +213,10 @@ exit 0
 第 5 阶段仍需要根据主路由型号处理。脚本结束时会提示：
 
 ```text
-推荐方式 A：client gateway/DNS -> LXC_IP
-兼容方式 B：client DNS -> LXC_IP，并添加 route 28.0.0.0/8 -> LXC_IP
+KDocs 默认模式：client DNS -> LXC_IP，并添加 route 198.18.0.0/16 -> LXC_IP
+完整网关模式：client gateway/DNS -> LXC_IP
 ```
 
-方式 A 是 Telegram、TikTok、YouTube 等移动 App 的默认方案。方式 B 只覆盖 Fake-IP，Telegram 固定 DC IP、真实 IP、IPv6 和部分 UDP 可能绕过 LXC。
+KDocs 模式只覆盖 Fake-IP，Telegram 固定 DC IP、真实 IP、IPv6 和部分 UDP 可能绕过 LXC。需要这些流量也经过 LXC 时使用 ROUTING_MODE=gateway。
 
 如果主路由是 OpenWrt/iStoreOS/ImmortalWrt，后续可以继续加 `router-openwrt.sh` 做自动配置。

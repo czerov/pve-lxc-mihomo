@@ -34,10 +34,12 @@ This program can only be run on AMD64 processors with v3 microarchitecture suppo
 - 如果存在 NexusBox：自动替换 `/opt/mihomo/mihomo` 核心并重启 NexusBox。
 - 自动安装修补版 NexusBox，兼容当前 Mihomo 热重载 API。
 - 代理页自动读取 provider 节点测速历史，显示延迟或“超时”。
-- 如果不存在 NexusBox：自动安装纯 Mihomo systemd 服务。
+- 新建 LXC 默认从官方脚本安装 NexusBox，并安装 Zashboard。
+- 可显式选择纯 Mihomo systemd 服务。
 - 自动测试 Mihomo 配置。
-- 自动配置 `/etc/rc.local` NAT 自启。
-- 自动开启 `/proc/sys/net/ipv4/ip_forward`。
+- 默认启用 KDocs TUN、DNS 53 和 Fake-IP 198.18.0.0/16。
+- 自动配置 rc.local MASQUERADE 自启。
+- 自动配置 IPv4/IPv6 转发和 IPv6 RA。
 - 自动安装缺失的 `iptables` 等依赖。
 - 国内网络下载：先试 GitHub 原地址，失败后试 GitHub 加速地址。
 - 所有覆盖前都会备份原文件，不批量删除文件。
@@ -80,8 +82,10 @@ VERSION=v1.19.28 bash <(curl -fsSL https://gh-proxy.com/https://raw.githubuserco
 
 ```bash
 cat /proc/sys/net/ipv4/ip_forward
+cat /proc/sys/net/ipv6/conf/all/forwarding
 iptables -t nat -S POSTROUTING
-ss -lntup | grep -E '(:7877|:7890|:7896|:9090|:6666|:18080)'
+ip link show Meta
+ss -lntup | grep -E '(:53|:7890|:9090|:18080)'
 ```
 
 期望看到：
@@ -102,33 +106,32 @@ LXC_IP:9090 控制端口正常
 
 ## 主路由第五阶段配置
 
-推荐把需要代理的终端设备网关和 DNS 都设置为 LXC 容器 IP：
-
-```text
-网关：LXC 容器 IP，例如 192.168.1.9
-DNS：LXC 容器 IP，例如 192.168.1.9
-```
-
-该方式可以代理 Telegram 固定 DC IP 和没有经过 Fake-IP DNS 查询的 App 流量。NexusBox 中保持 TUN、TProxy 关闭。
-
-仅在明确了解限制时，才使用保留原网关的 Fake-IP 静态路由方式：
-
-```text
-目的网络：28.0.0.0
-子网掩码：255.0.0.0
-下一跳/网关：LXC 容器 IP，例如 192.168.1.9
-```
-
-并关闭“允许 ICMP 重定向”一类选项。
-
-此兼容方式下终端设备配置为：
+默认采用 KDocs 高性能模式，终端设备保持原主路由，只修改 DNS：
 
 ```text
 网关：保持原主路由
 DNS：LXC 容器 IP，例如 192.168.1.9
 ```
 
-注意：该静态路由只覆盖 `28.0.0.0/8`。Telegram 固定 DC IP、真实 IP、IPv6 和部分 UDP 不会经过 LXC，不推荐用于 Telegram、TikTok 等移动 App。
+主路由添加：
+
+```text
+目的网络：198.18.0.0
+子网掩码：255.255.0.0
+下一跳/网关：LXC 容器 IP，例如 192.168.1.9
+```
+
+并关闭“允许 ICMP 重定向”。KDocs 模式会自动启用 Mihomo TUN，NexusBox 中不需要再打开 TProxy。
+
+该模式只覆盖 Fake-IP。Telegram 固定 DC IP、真实 IP、IPv6 和部分 UDP 可能绕过 LXC。
+
+需要完整网关模式时执行：
+
+```bash
+ROUTING_MODE=gateway bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install-cn.sh)
+```
+
+然后把终端设备网关和 DNS 都设置为 LXC IP。
 
 ## 常见问题
 

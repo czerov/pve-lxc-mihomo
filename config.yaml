@@ -75,7 +75,7 @@ allow-lan: true
 routing-mark: 1
 # 控制面板
 external-controller: '0.0.0.0:9090'
-external-ui: ui/meta
+external-ui: ui/zash
 external-ui-url: 'https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip'
 geox-url:
   geoip: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat"
@@ -86,8 +86,13 @@ profile:
   store-selected: true
   store-fake-ip: true
 tun:
-  # Linux 默认使用 nftables 转发（TProxy + Redirect），也可切换为 TUN；macOS 默认启用 TUN
-  enable: false
+  # KDocs 模式依靠 TUN 接管主路由送来的 198.18.0.0/16 Fake-IP 流量。
+  enable: true
+  stack: gvisor
+  device: Meta
+  auto-route: true
+  auto-detect-interface: true
+  strict-route: true
 # 嗅探
 sniffer:
   enable: true
@@ -115,18 +120,20 @@ sniffer:
     - "+.push.apple.com"
 dns:
   enable: true
-  # 默认端口也不能修改
-  listen: 0.0.0.0:6666
-  # 当前一键脚本只配置 IPv4 透明代理，禁止向客户端返回 AAAA，避免手机 IPv6 绕过旁路由。
+  # KDocs 模式由 Mihomo 直接监听 53 端口。
+  listen: 0.0.0.0:53
+  # KDocs 静态路由只覆盖 IPv4 Fake-IP，禁止向客户端返回 AAAA。
   ipv6: false
   enhanced-mode: fake-ip
   respect-rules: true
-  # 这个也不能修改和mosdns联动的
-  fake-ip-range: 28.0.0.1/8
+  # KDocs 主路由静态路由必须与该网段保持一致。
+  fake-ip-range: 198.18.0.1/16
   fake-ip-range6: f2b0::/18
+  fake-ip-filter-mode: blacklist
   fake-ip-filter:
-    - "*"
-    - +.lan
+    - "rule-set:Private-Domain"
+    - "rule-set:China"
+    - "+.lan"
   default-nameserver:
     - 223.5.5.5
     - 119.29.29.29
@@ -192,7 +199,7 @@ rule-providers:
   AppleCN: {<<: *DomainMrs, path: ./rules/apple-cn.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/apple-cn.mrs}
   Microsoft: {<<: *DomainMrs, path: ./rules/microsoft.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/microsoft.mrs}
   TikTok: {<<: *DomainMrs, path: ./rules/tiktok.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/tiktok.mrs}
-#  China: {<<: *DomainMrs, path: ./rules/cn.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/cn.mrs}
+  China: {<<: *DomainMrs, path: ./rules/cn.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/cn.mrs}
 #  Foreign: {<<: *DomainMrs, path: ./rules/geolocation-!cn.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/geolocation-!cn.mrs}
   PT: {<<: *DomainMrs, path: ./rules/category-pt.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/category-pt.mrs}
   PT-!CN: { <<: *DomainMrs, url: 'https://gh-proxy.com/raw.githubusercontent.com/metacubex/meta-rules-dat/meta/geo/geosite/category-pt@!cn.mrs' }
@@ -277,7 +284,7 @@ rules:
   - RULE-SET,Microsoft-CN,全球直连
   - RULE-SET,Apple,苹果服务
   - RULE-SET,TikTok,TikTok
-  #  - RULE-SET,China,全球直连
+  - RULE-SET,China,全球直连
   - RULE-SET,ChinaSpeedtest,全球直连
   #  - RULE-SET,Foreign,节点选择
   - RULE-SET,ForeignSpeedtest,网络测试

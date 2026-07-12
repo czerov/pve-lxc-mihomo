@@ -3,9 +3,9 @@ set -Eeuo pipefail
 
 # Run this on the Proxmox VE host. It automates stages 1-4:
 # 1. Create Debian LXC.
-# 2. Configure privileged LXC, nesting, keyctl and TUN.
-# 3. Run the Mihomo/NexusBox installer inside LXC.
-# 4. Configure LXC NAT firewall and rc.local inside LXC.
+# 2. Configure privileged LXC, TUN, forwarding and Zashboard.
+# 3. Install NexusBox and the CPU-compatible Mihomo core.
+# 4. Configure KDocs MASQUERADE firewall and rc.local inside LXC.
 
 REPO="${REPO:-czerov/pve-lxc-mihomo}"
 BRANCH="${BRANCH:-main}"
@@ -42,7 +42,18 @@ TEMPLATE_MIRROR="${TEMPLATE_MIRROR:-auto}"
 TEMPLATE_URL="${TEMPLATE_URL:-}"
 CT_PASSWORD="${CT_PASSWORD:-}"
 CT_DNS="${CT_DNS:-223.5.5.5}"
+if [ "${LXC_INSTALL_MODE+x}" = "x" ]; then
+  LXC_INSTALL_MODE_WAS_SET=1
+else
+  LXC_INSTALL_MODE_WAS_SET=0
+fi
 LXC_INSTALL_MODE="${LXC_INSTALL_MODE:-auto}"
+if [ "${ROUTING_MODE+x}" = "x" ]; then
+  ROUTING_MODE_WAS_SET=1
+else
+  ROUTING_MODE_WAS_SET=0
+fi
+ROUTING_MODE="${ROUTING_MODE:-kdocs}"
 VERSION="${VERSION:-latest}"
 LXC_PROXY="${LXC_PROXY:-off}"
 LXC_PROXY_ADDR="${LXC_PROXY_ADDR:-}"
@@ -60,6 +71,7 @@ NEXUSBOX_PATCHED_URL="${NEXUSBOX_PATCHED_URL:-}"
 NEXUSBOX_PATCHED_SHA256="${NEXUSBOX_PATCHED_SHA256:-}"
 DEFAULT_CONFIG_URL="${DEFAULT_CONFIG_URL:-${RAW_BASE}/config.yaml}"
 CONFIG_URL="${CONFIG_URL:-$DEFAULT_CONFIG_URL}"
+ZASHBOARD_URL="${ZASHBOARD_URL:-https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip}"
 
 WORK_DIR="${WORK_DIR:-/tmp/pve-mihomo-router}"
 LOG="${LOG:-/root/pve-mihomo-router-install.log}"
@@ -69,6 +81,13 @@ exec > >(tee -a "$LOG") 2>&1
 say() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
 die() { say "错误：$*"; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
+
+validate_routing_mode() {
+  case "$ROUTING_MODE" in
+    kdocs|gateway) ;;
+    *) die "未知 ROUTING_MODE=$ROUTING_MODE，请使用 kdocs 或 gateway。" ;;
+  esac
+}
 
 prefer_cn_accel_enabled() {
   case "$PREFER_CN_ACCEL" in
@@ -181,7 +200,12 @@ is_interactive() {
 }
 
 prompt_choices() {
-  is_interactive || return 0
+  if ! is_interactive; then
+    if [ "$LXC_INSTALL_MODE_WAS_SET" = "0" ] && [ "$LXC_INSTALL_MODE" = "auto" ]; then
+      LXC_INSTALL_MODE="nexusbox-install"
+    fi
+    return 0
+  fi
 
   if [ "$LXC_INSTALL_MODE" = "auto" ] && [ -z "$NEXUSBOX_INSTALL_URL" ]; then
     echo
@@ -190,9 +214,9 @@ prompt_choices() {
     echo "  2) 自动判断：已有 NexusBox 就修复核心，否则安装纯 Mihomo"
     echo "  3) 只修复已有 NexusBox 的 Mihomo 核心"
     echo "  4) 新建/准备 LXC 后，从安装脚本安装 NexusBox UI，再自动安装适配的 Mihomo 核心"
-    printf "请选择 [1-4，默认 1]: "
+    printf "请选择 [1-4，默认 4]: "
     read -r install_choice
-    case "${install_choice:-1}" in
+    case "${install_choice:-4}" in
       1) LXC_INSTALL_MODE="standalone" ;;
       2) LXC_INSTALL_MODE="auto" ;;
       3) LXC_INSTALL_MODE="nexusbox" ;;
@@ -205,6 +229,21 @@ prompt_choices() {
         NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-$NEXUSBOX_DEFAULT_INSTALL_URL}"
         ;;
       *) die "无效安装模式选择: $install_choice" ;;
+    esac
+  fi
+
+  if [ "$ROUTING_MODE_WAS_SET" = "0" ]; then
+    echo
+    echo "路由架构："
+    echo "  1) KDocs 高性能模式（默认）：原网关不变，DNS 指向 LXC，主路由添加 198.18.0.0/16 静态路由"
+    echo "  2) 完整网关模式：客户端网关和 DNS 都指向 LXC"
+    echo "  注意：KDocs 模式无法接管 Telegram 固定 DC IP、IPv6 和部分 UDP。"
+    printf "请选择 [1-2，默认 1]: "
+    read -r routing_choice
+    case "${routing_choice:-1}" in
+      1) ROUTING_MODE="kdocs" ;;
+      2) ROUTING_MODE="gateway" ;;
+      *) die "无效路由架构选择: $routing_choice" ;;
     esac
   fi
 
@@ -230,6 +269,7 @@ prompt_choices() {
   fi
 
   say "已选择安装模式: $LXC_INSTALL_MODE"
+  say "已选择路由模式: $ROUTING_MODE"
   say "已选择 LXC 代理模式: $LXC_PROXY"
 }
 
@@ -817,7 +857,7 @@ run_in_container() {
   chmod +x "$local_install"
   pct push "$CTID" "$local_install" /root/mihomo-router-install.sh -perms 0755
 
-  local env_args=(MODE="$LXC_INSTALL_MODE" VERSION="$VERSION" NEXUSBOX_INSTALL_URL="$NEXUSBOX_INSTALL_URL" NEXUSBOX_DEFAULT_INSTALL_URL="$NEXUSBOX_DEFAULT_INSTALL_URL" NEXUSBOX_PATCHED_ENABLE="$NEXUSBOX_PATCHED_ENABLE" NEXUSBOX_PATCHED_REPO="$REPO" NEXUSBOX_PATCHED_BRANCH="$BRANCH" NEXUSBOX_PATCHED_REF="$NEXUSBOX_PATCHED_REF" NEXUSBOX_PATCHED_BASE="$NEXUSBOX_PATCHED_BASE" NEXUSBOX_PATCHED_URL="$NEXUSBOX_PATCHED_URL" NEXUSBOX_PATCHED_SHA256="$NEXUSBOX_PATCHED_SHA256" CONFIG_URL="$CONFIG_URL" PREFER_CN_ACCEL="$PREFER_CN_ACCEL" GH_PROXY="$GH_PROXY" DOWNLOAD_SPEED_LIMIT="$DOWNLOAD_SPEED_LIMIT" DOWNLOAD_SPEED_TIME="$DOWNLOAD_SPEED_TIME")
+  local env_args=(MODE="$LXC_INSTALL_MODE" ROUTING_MODE="$ROUTING_MODE" VERSION="$VERSION" NEXUSBOX_INSTALL_URL="$NEXUSBOX_INSTALL_URL" NEXUSBOX_DEFAULT_INSTALL_URL="$NEXUSBOX_DEFAULT_INSTALL_URL" NEXUSBOX_PATCHED_ENABLE="$NEXUSBOX_PATCHED_ENABLE" NEXUSBOX_PATCHED_REPO="$REPO" NEXUSBOX_PATCHED_BRANCH="$BRANCH" NEXUSBOX_PATCHED_REF="$NEXUSBOX_PATCHED_REF" NEXUSBOX_PATCHED_BASE="$NEXUSBOX_PATCHED_BASE" NEXUSBOX_PATCHED_URL="$NEXUSBOX_PATCHED_URL" NEXUSBOX_PATCHED_SHA256="$NEXUSBOX_PATCHED_SHA256" CONFIG_URL="$CONFIG_URL" ZASHBOARD_URL="$ZASHBOARD_URL" PREFER_CN_ACCEL="$PREFER_CN_ACCEL" GH_PROXY="$GH_PROXY" DOWNLOAD_SPEED_LIMIT="$DOWNLOAD_SPEED_LIMIT" DOWNLOAD_SPEED_TIME="$DOWNLOAD_SPEED_TIME")
   if [ -n "$LXC_PROXY_HTTP" ]; then
     env_args+=(
       http_proxy="$LXC_PROXY_HTTP"
@@ -832,7 +872,7 @@ run_in_container() {
 verify_container_health() {
   say "正在验证 LXC 运行状态"
   local result
-  result="$(pct exec "$CTID" -- sh -s <<'EOS'
+  result="$(pct exec "$CTID" -- env ROUTING_MODE="$ROUTING_MODE" sh -s <<'EOS'
 set -eu
 fail=0
 profile=standalone
@@ -892,6 +932,10 @@ check_dns_runtime() {
     return 0
   fi
   check_port "$dns_port" "Mihomo DNS 服务"
+  if [ "${ROUTING_MODE:-kdocs}" = "kdocs" ] && [ "$dns_port" != "53" ]; then
+    echo "失败：KDocs 模式要求 DNS 监听 53，当前为 $dns_port"
+    fail=1
+  fi
   if [ "$dns_port" != "53" ]; then
     if iptables -t nat -S PREROUTING 2>/dev/null | grep -Eq -- "--dport 53 .*--to-ports ${dns_port}"; then
       echo "正常：DNS 转发 53 -> ${dns_port}"
@@ -921,6 +965,10 @@ detect_redir_port() {
 check_transparent_runtime() {
   local config_file redir_port
   config_file="$1"
+  if [ "${ROUTING_MODE:-kdocs}" = "kdocs" ]; then
+    echo "正常：KDocs 模式不启用 TCP REDIRECT"
+    return 0
+  fi
   redir_port="$(detect_redir_port "$config_file" || true)"
   if [ -z "$redir_port" ]; then
     echo "警告：${config_file} 中未找到 redir-port"
@@ -957,6 +1005,20 @@ else
   fail=1
 fi
 
+if [ "${ROUTING_MODE:-kdocs}" = "kdocs" ] && [ -e /proc/sys/net/ipv6/conf/all/forwarding ]; then
+  if [ "$(cat /proc/sys/net/ipv6/conf/all/forwarding 2>/dev/null || echo 0)" = "1" ]; then
+    echo "正常：IPv6 转发已开启"
+  else
+    echo "失败：IPv6 转发未开启"
+    fail=1
+  fi
+fi
+
+if [ "${ROUTING_MODE:-kdocs}" = "kdocs" ]; then
+  check_cmd "TUN 设备权限" test -c /dev/net/tun
+  check_cmd "Meta TUN 网卡" ip link show Meta
+fi
+
 if iptables -t nat -S POSTROUTING 2>/dev/null | grep -q -- '-j MASQUERADE'; then
   echo "正常：NAT MASQUERADE 规则"
 else
@@ -981,6 +1043,7 @@ print_summary() {
   echo "LXC ID：$CTID"
   echo "LXC IP：$ip"
   echo "安装类型：$INSTALL_PROFILE"
+  echo "路由模式：$ROUTING_MODE"
   if [ "$INSTALL_PROFILE" = "nexusbox" ]; then
     echo "NexusBox 管理页面：http://${ip}:18080"
   else
@@ -988,15 +1051,26 @@ print_summary() {
   fi
   echo "Mihomo HTTP/SOCKS 代理：${ip}:7890"
   echo "Mihomo 控制接口：http://${ip}:9090"
-  [ "$INSTALL_PROFILE" = "standalone" ] && echo "Mihomo DNS：${ip}:1053"
+  if [ "$ROUTING_MODE" = "kdocs" ]; then
+    echo "Mihomo DNS：${ip}:53"
+  elif [ "$INSTALL_PROFILE" = "standalone" ]; then
+    echo "Mihomo DNS：${ip}:6666（客户端仍访问 53，由 LXC 转发）"
+  fi
   [ -n "$LXC_PROXY_HTTP" ] && echo "安装时使用的 LXC 代理：$LXC_PROXY_HTTP"
   echo
   echo "第 5 阶段需要在主路由或终端设置："
-  echo "  推荐方式 A：把客户端网关和 DNS 都设置为 ${ip}"
-  echo "    适用于 Telegram、TikTok、YouTube 等移动 App"
-  echo "  兼容方式 B：保留原网关，把 DNS 设置为 ${ip}，并添加静态路由 28.0.0.0/8 -> ${ip}"
-  echo "    注意：Telegram 固定 IP、真实 IP、IPv6 和部分 UDP 可能绕过 LXC"
-  echo "  客户端 DNS：${ip}"
+  if [ "$ROUTING_MODE" = "kdocs" ]; then
+    echo "  KDocs 模式："
+    echo "    客户端网关：保持原主路由"
+    echo "    客户端 DNS：${ip}"
+    echo "    静态路由：198.18.0.0/16 -> ${ip}"
+    echo "    主路由关闭 ICMP 重定向"
+    echo "    限制：Telegram 固定 DC IP、真实 IP、IPv6 和部分 UDP 可能绕过 LXC"
+  else
+    echo "  完整网关模式："
+    echo "    客户端网关：${ip}"
+    echo "    客户端 DNS：${ip}"
+  fi
   echo
   echo "安装日志：$LOG"
 }
@@ -1004,6 +1078,7 @@ print_summary() {
 main() {
   require_pve_host
   prompt_choices
+  validate_routing_mode
   detect_storage
   if [ "$USE_EXISTING" = "1" ]; then
     confirm_existing_ctid

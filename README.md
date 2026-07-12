@@ -1,6 +1,6 @@
 # PVE LXC Mihomo / NexusBox 旁路由一键安装
 
-在 Proxmox VE 宿主机上一键完成 Debian 13 LXC 创建、Mihomo / NexusBox 安装、默认规则导入和透明代理配置。安装菜单、检测过程和完成报告均使用中文。
+在 Proxmox VE 宿主机上一键完成 Debian 13 LXC 创建、Mihomo / NexusBox / Zashboard 安装、默认规则导入和 KDocs 高性能旁路由配置。安装菜单、检测过程和完成报告均使用中文。
 
 ## 当前版本功能
 
@@ -13,7 +13,9 @@
 - NexusBox 修补版兼容当前 Mihomo 热重载 API，解决 `Body invalid`
 - NexusBox 代理页支持 provider 节点测速，正常显示延迟或“超时”
 - 默认导入公开安全的 MSM 风格规则，保留 AI、Google、Telegram、Netflix、Apple、Microsoft、PT、游戏和 Speedtest 分组
-- 自动配置 DNS 53 转发、TCP 透明代理、NAT、IPv4 转发和 `/etc/rc.local` 自启
+- 默认采用 KDocs 架构：TUN、DNS 53、Fake-IP `198.18.0.0/16`、IPv4/IPv6 转发、NAT 和 `/etc/rc.local` 自启
+- 自动下载 Zashboard 官方完整字体包到 `/opt/config/ui/zash`
+- 可用 `ROUTING_MODE=gateway` 切回网关/DNS 都指向 LXC 的完整网关模式
 - 国内下载自动尝试 `gh-proxy.com`、`gh.llkk.cc`、GitHub Raw 和 jsDelivr
 - 安装前自动备份被覆盖文件，不包含私人订阅、节点、密码或密钥
 
@@ -33,13 +35,14 @@ bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-ins
 
 注意：`pve-install.sh` 不是在 LXC 容器里执行的。如果终端提示符像 `root@msn`、`root@debian`，并且报 `pct not found`，说明你进的是容器；请切到 PVE 宿主机 root shell，或者改用下面的“仅容器内安装 / 修复”命令。
 
-默认会弹出交互选择：
+默认会弹出中文交互选择；直接回车会从零安装 NexusBox，并使用 KDocs 路由模式：
 
 - 纯 Mihomo 旁路由：无 NexusBox UI，无 `18080`
 - 自动模式：已有 NexusBox 就修复核心，否则装纯 Mihomo
 - 修复已有 NexusBox 核心
 - 从零安装 NexusBox UI 后修复核心，默认使用 Ladavian/NexusBox 官方安装脚本，并自动尝试 CDN / GitHub 加速源
 - NexusBox 模式会替换为仓库内修补版 NexusBox 二进制，修复当前 mihomo 热重载 `Body invalid`，并让代理页正确读取 provider 节点延迟、显示测速结果或“超时”
+- 路由架构：KDocs 高性能模式、完整网关模式
 - LXC 代理：关闭、自动探测、手动输入
 
 如果不想交互，可以加 `INTERACTIVE=0` 并用环境变量指定。
@@ -100,9 +103,9 @@ CT_TEMPLATE_NAME=debian-12-standard_12.12-1_amd64.tar.zst bash <(curl -fsSL http
 CT_ROOTFS_STORAGE=local bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-install-cn.sh)
 ```
 
-安装结束前脚本会复查运行状态：进程、systemd 服务、监听端口、`ip_forward`、NAT 规则和 mihomo 配置热重载都通过后才打印成功。新建 LXC 默认是纯 Mihomo 模式，不安装 NexusBox，所以没有 `18080` 页面；选择 NexusBox 安装模式后才会开放 `18080` 页面。
+安装结束前脚本会复查运行状态：进程、systemd 服务、监听端口、TUN 网卡、IPv4/IPv6 转发、NAT 规则和 Mihomo 配置热重载都通过后才打印成功。新建 LXC 默认从官方脚本安装 NexusBox，并开放 `18080` 页面。
 
-如果导入的配置里 `dns.listen` 不是标准 `53` 端口，例如公开默认配置使用 `0.0.0.0:6666`，脚本会自动在 LXC 内持久化 DNS 转发，把客户端访问的 `53/tcp` 和 `53/udp` 转到实际 DNS 端口，并在健康检查里验证这条规则。
+KDocs 模式会停止 `systemd-resolved`，让 Mihomo 直接监听 `0.0.0.0:53`。完整网关模式使用 `0.0.0.0:6666`，并自动把客户端访问的 `53/tcp` 和 `53/udp` 转到实际 DNS 端口。
 
 无代理也可以尝试一键安装。国内网络建议从 `pve-install-cn.sh` 启动，它会默认启用 `PREFER_CN_ACCEL=1`，优先使用 jsDelivr、`gh-proxy.com` 等国内可用源，raw GitHub 只作为最后兜底。Mihomo 核心、NexusBox 和 `geoip.dat` / `geosite.dat` / `country.mmdb` 都带多源回退；GEO 文件还会检查下载大小，避免把错误页面当成数据库。若所有加速源都不可用，再使用 `LXC_PROXY=auto` 或手动指定代理。
 
@@ -147,9 +150,9 @@ LXC_PROXY=disable USE_EXISTING=1 CTID=109 bash <(curl -fsSL https://gh-proxy.com
 自动完成：
 
 - 第 1 阶段：下载 Debian LXC 模板并创建 LXC
-- 第 2 阶段：配置 LXC 特权、嵌套、TUN
-- 第 3 阶段：进入 LXC 安装 / 修复 Mihomo 或 NexusBox 核心
-- 第 4 阶段：配置 LXC 内 NAT、`ip_forward`、`/etc/rc.local`
+- 第 2 阶段：配置 LXC 特权、TUN、IPv4/IPv6 转发并安装 Zashboard
+- 第 3 阶段：从官方脚本安装 NexusBox，再安装自动适配 CPU 的 Mihomo 核心
+- 第 4 阶段：配置 LXC 内 MASQUERADE 和 `/etc/rc.local`
 
 ## 已有 LXC 自动安装 / 修复
 
@@ -273,19 +276,13 @@ GH_PROXY=https://gh.llkk.cc bash <(curl -fsSL https://gh-proxy.com/https://raw.g
 
 ## 安装后主路由配置
 
-### 方式 A（推荐）
+### KDocs 高性能模式（默认）
 
-把终端设备或主路由的网关和 DNS 都指向 LXC 容器 IP，例如 `192.168.1.9`。脚本会在 LXC 内配置 TCP 透明代理、DNS 转发和 NAT。
-
-该方式能够处理 Telegram 固定 DC IP，以及没有经过 Fake-IP DNS 查询的 App 连接。Telegram、TikTok、YouTube 等移动 App 应使用方式 A。NexusBox 中保持 TUN、TProxy 关闭即可使用脚本配置的透明代理链路。
-
-### 方式 B（兼容性有限，不推荐用于移动 App）
-
-保留原网关，只把终端设备 DNS 填 LXC 容器 IP，并在主路由添加 Fake-IP 静态路由：
+保留终端设备原网关，只把 DNS 设置为 LXC 容器 IP，并在主路由添加 Fake-IP 静态路由：
 
 ```text
-目的网络：28.0.0.0
-子网掩码：255.0.0.0
+目的网络：198.18.0.0
+子网掩码：255.255.0.0
 下一跳/网关：LXC 容器 IP，例如 192.168.1.9
 ```
 
@@ -295,7 +292,17 @@ GH_PROXY=https://gh.llkk.cc bash <(curl -fsSL https://gh-proxy.com/https://raw.g
 192.168.1.9
 ```
 
-方式 B 只会把 `28.0.0.0/8` Fake-IP 流量送到 LXC。Telegram 固定 DC IP、应用缓存的真实 IP、IPv6 和部分 UDP 流量不会命中该静态路由，可能出现网页正常但 Telegram 一直“连接中”的情况。
+主路由还需要关闭 ICMP 重定向。该模式只会把 `198.18.0.0/16` Fake-IP 流量送到 LXC，Telegram 固定 DC IP、应用缓存的真实 IP、IPv6 和部分 UDP 流量不会命中该静态路由。
+
+### 完整网关模式
+
+需要移动 App 固定 IP 也经过 LXC 时，安装时选择完整网关模式，或非交互执行：
+
+```bash
+ROUTING_MODE=gateway bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/pve-install-cn.sh)
+```
+
+然后把终端设备网关和 DNS 都指向 LXC 容器 IP。
 
 ## 详细教程
 
