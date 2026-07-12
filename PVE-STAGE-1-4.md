@@ -217,6 +217,6 @@ KDocs 默认模式：client DNS -> LXC_IP，并添加 route 198.18.0.0/16 -> LXC
 完整网关模式：client gateway/DNS -> LXC_IP
 ```
 
-KDocs 模式只覆盖 Fake-IP，Telegram 固定 DC IP、真实 IP、IPv6 和部分 UDP 可能绕过 LXC。需要这些流量也经过 LXC 时使用 ROUTING_MODE=gateway。
+KDocs 模式默认只覆盖 Fake-IP。爱快可额外把 `91.108.56.0/22`、`91.108.4.0/22`、`91.108.8.0/22`、`91.108.16.0/22`、`91.108.12.0/22`、`149.154.160.0/20`、`91.105.192.0/23`、`91.108.20.0/22`、`185.76.151.0/24` 的下一跳设置为 LXC IP，使 Telegram 固定 IPv4 命中 `TelegramIP` 规则。IPv6 和未补充的真实 IP 仍可能绕过 LXC；需要全部流量经过 LXC 时使用 `ROUTING_MODE=gateway`。
 
 如果主路由是 OpenWrt/iStoreOS/ImmortalWrt，后续可以继续加 `router-openwrt.sh` 做自动配置。

@@ -248,7 +248,7 @@ prompt_choices() {
     echo "路由架构："
     echo "  1) KDocs 高性能模式（默认）：原网关不变，DNS 指向 LXC，主路由添加 198.18.0.0/16 静态路由"
     echo "  2) 完整网关模式：客户端网关和 DNS 都指向 LXC"
-    echo "  注意：KDocs 模式无法接管 Telegram 固定 DC IP、IPv6 和部分 UDP。"
+    echo "  注意：KDocs 默认只接管 Fake-IP；Telegram 固定 IPv4 可在爱快补充静态路由。"
     printf "请选择 [1-2，默认 1]: "
     read -r routing_choice
     case "${routing_choice:-1}" in
@@ -1048,6 +1048,21 @@ EOS
   [ -n "$INSTALL_PROFILE" ] || INSTALL_PROFILE="unknown"
 }
 
+print_telegram_ipv4_routes() {
+  local next_hop="$1"
+  cat <<EOF
+      91.108.56.0/22 -> ${next_hop}
+      91.108.4.0/22 -> ${next_hop}
+      91.108.8.0/22 -> ${next_hop}
+      91.108.16.0/22 -> ${next_hop}
+      91.108.12.0/22 -> ${next_hop}
+      149.154.160.0/20 -> ${next_hop}
+      91.105.192.0/23 -> ${next_hop}
+      91.108.20.0/22 -> ${next_hop}
+      185.76.151.0/24 -> ${next_hop}
+EOF
+}
+
 print_summary() {
   local ip="${CT_IP_CIDR%/*}"
   say "第 1-4 阶段已完成"
@@ -1076,7 +1091,9 @@ print_summary() {
     echo "    客户端 DNS：${ip}"
     echo "    静态路由：198.18.0.0/16 -> ${ip}"
     echo "    主路由关闭 ICMP 重定向"
-    echo "    限制：Telegram 固定 DC IP、真实 IP、IPv6 和部分 UDP 可能绕过 LXC"
+    echo "    爱快 Telegram 固定 IPv4 补充路由（出口接口选择 LAN，下一跳均为 LXC）："
+    print_telegram_ipv4_routes "$ip"
+    echo "    限制：未补充的真实 IP、IPv6 和部分 UDP 仍可能绕过 LXC"
   else
     echo "  完整网关模式："
     echo "    客户端网关：${ip}"
