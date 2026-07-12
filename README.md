@@ -306,7 +306,17 @@ GH_PROXY=https://gh.llkk.cc bash <(curl -fsSL https://gh-proxy.com/https://raw.g
 185.76.151.0/24
 ```
 
-这些流量进入 LXC 后会命中默认配置中的 `TelegramIP -> Telegram` 规则。IPv6 下一跳是每台设备自己的链路本地地址，脚本不会写死；未补充的真实 IP、IPv6 和部分 UDP 仍可能绕过 LXC。
+Telegram IPv6 静态路由：
+
+```text
+2001:b28:f23d::/48
+2001:b28:f23f::/48
+2001:67c:4e8::/48
+2001:b28:f23c::/48
+2a0a:f280::/32
+```
+
+IPv6 下一跳填写脚本在安装完成报告中检测到的当前 LXC `fe80::` 链路本地地址，并在爱快中绑定局域网出口接口。不要复用其他 LXC 的 `fe80::` 地址。这些流量进入 LXC 后会命中默认配置中的 `TelegramIP -> Telegram` 规则；未补充的真实 IP 和部分 UDP 仍可能绕过 LXC。
 
 ### 完整网关模式
 

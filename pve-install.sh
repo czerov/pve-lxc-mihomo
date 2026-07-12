@@ -248,7 +248,7 @@ prompt_choices() {
     echo "路由架构："
     echo "  1) KDocs 高性能模式（默认）：原网关不变，DNS 指向 LXC，主路由添加 198.18.0.0/16 静态路由"
     echo "  2) 完整网关模式：客户端网关和 DNS 都指向 LXC"
-    echo "  注意：KDocs 默认只接管 Fake-IP；Telegram 固定 IPv4 可在爱快补充静态路由。"
+    echo "  注意：KDocs 默认只接管 Fake-IP；Telegram 固定 IPv4/IPv6 可在爱快补充静态路由。"
     printf "请选择 [1-2，默认 1]: "
     read -r routing_choice
     case "${routing_choice:-1}" in
@@ -1063,8 +1063,24 @@ print_telegram_ipv4_routes() {
 EOF
 }
 
+detect_lxc_link_local_ipv6() {
+  pct exec "$CTID" -- ip -6 -o addr show scope link 2>/dev/null |
+    awk '$4 ~ /^fe80:/ {sub(/\/.*/, "", $4); print $4; exit}'
+}
+
+print_telegram_ipv6_routes() {
+  local next_hop="$1"
+  cat <<EOF
+      2001:b28:f23d::/48 -> ${next_hop}
+      2001:b28:f23f::/48 -> ${next_hop}
+      2001:67c:4e8::/48 -> ${next_hop}
+      2001:b28:f23c::/48 -> ${next_hop}
+      2a0a:f280::/32 -> ${next_hop}
+EOF
+}
+
 print_summary() {
-  local ip="${CT_IP_CIDR%/*}"
+  local ip="${CT_IP_CIDR%/*}" ipv6_next_hop
   say "第 1-4 阶段已完成"
   echo "LXC ID：$CTID"
   echo "LXC IP：$ip"
@@ -1093,7 +1109,14 @@ print_summary() {
     echo "    主路由关闭 ICMP 重定向"
     echo "    爱快 Telegram 固定 IPv4 补充路由（出口接口选择 LAN，下一跳均为 LXC）："
     print_telegram_ipv4_routes "$ip"
-    echo "    限制：未补充的真实 IP、IPv6 和部分 UDP 仍可能绕过 LXC"
+    ipv6_next_hop="$(detect_lxc_link_local_ipv6 || true)"
+    if [ -n "$ipv6_next_hop" ]; then
+      echo "    爱快 Telegram 固定 IPv6 补充路由（出口接口选择 LAN，下一跳为当前 LXC 链路本地地址）："
+      print_telegram_ipv6_routes "$ipv6_next_hop"
+    else
+      echo "    警告：未检测到 LXC IPv6 链路本地地址，无法生成 Telegram IPv6 路由。"
+    fi
+    echo "    限制：未补充的真实 IP 和部分 UDP 仍可能绕过 LXC"
   else
     echo "  完整网关模式："
     echo "    客户端网关：${ip}"
