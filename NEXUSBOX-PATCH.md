@@ -20,6 +20,7 @@
 - 单条订阅可启用“通过节点选择更新”，由已可用的代理节点访问受限订阅地址，避免给第一订阅造成循环依赖。
 - 配置页在 NexusBox 或 Mihomo 刚重启时自动重试配置和 YAML 加载，不再依赖手动刷新。
 - 节点测速设置 25 秒上限，结束后强制清除“测速中”状态，并显示正常、超时和总节点数汇总。
+- 当 Mihomo 的 `/proxies` 不返回 provider 节点时，从 `/providers/proxies` 补全节点及测速历史，避免把整组误判为超时。
 
 构建命令：
 
@@ -35,6 +36,6 @@ GOOS=linux GOARCH=arm64 go build -tags vue -ldflags="-s -w" -o nexusbox-linux-ar
 SHA256：
 
 ```text
-amd64  24e726dbb12cffd3bf49ea487c1a05da9207de57120347161abb9c9bb877c449
-arm64  1aac5dba4dce74736c5c0ceae71f7f8c5fca17fafb0756461405d2bb4dea1ff2
+amd64  eb732ad143c6cf3722949cbb415f55d275f11dcc36ef2dea2dbdf9658871ec16
+arm64  ad3ea2abb9ca80fbea19e7a786696de6a379bb69853a9373eccfd739850ba03c
 ```
