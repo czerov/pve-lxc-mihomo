@@ -54,21 +54,23 @@ grep -q 'RULE-SET,YouTube,' "$CONFIG_FILE" ||
 cp -a "$CONFIG_FILE" "$BACKUP"
 say "已备份：$BACKUP"
 
-add_dns=1
-grep -q '"rule-set:YouTube,Google"' "$CONFIG_FILE" && add_dns=0
 add_group=1
 grep -q 'name: YouTube,' "$CONFIG_FILE" && add_group=0
 
-awk -v add_dns="$add_dns" -v add_group="$add_group" '
+awk -v add_group="$add_group" '
 function print_youtube_dns() {
-  print "    \"rule-set:YouTube,Google\":"
+  print "    \"rule-set:YouTube\":"
+  print "      - \"https://8.8.8.8/dns-query#节点选择\""
+  print "      - \"https://1.1.1.1/dns-query#节点选择\""
+  print "    \"rule-set:Google\":"
   print "      - \"https://8.8.8.8/dns-query#节点选择\""
   print "      - \"https://1.1.1.1/dns-query#节点选择\""
 }
 BEGIN {
   in_dns = 0
   in_policy = 0
-  dns_written = (add_dns == 0)
+  skip_dns_values = 0
+  dns_written = 0
   group_written = (add_group == 0)
 }
 {
@@ -91,6 +93,17 @@ BEGIN {
       dns_written = 1
     }
     in_policy = 0
+  }
+
+  if (in_policy && $0 ~ /^    "rule-set:(YouTube,Google|YouTube|Google)"[[:space:]]*:/) {
+    skip_dns_values = 1
+    next
+  }
+  if (in_policy && skip_dns_values && $0 ~ /^      - /) {
+    next
+  }
+  if (in_policy && skip_dns_values) {
+    skip_dns_values = 0
   }
 
   if ($0 ~ /^  - RULE-SET,YouTube,/) {
@@ -118,8 +131,8 @@ END {
 
 mv "$TMP" "$CONFIG_FILE"
 
-grep -q '"rule-set:YouTube,Google"' "$CONFIG_FILE" ||
-  die "YouTube DNS 策略写入失败。"
+grep -q '^    "rule-set:YouTube":' "$CONFIG_FILE" || die "YouTube DNS 策略写入失败。"
+grep -q '^    "rule-set:Google":' "$CONFIG_FILE" || die "Google DNS 策略写入失败。"
 grep -q 'name: YouTube,' "$CONFIG_FILE" ||
   die "YouTube 自动测速组写入失败。"
 grep -q '^  - RULE-SET,YouTube,YouTube$' "$CONFIG_FILE" ||

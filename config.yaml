@@ -144,10 +144,19 @@ dns:
     - 223.5.5.5
     - 119.29.29.29
   nameserver-policy:
-    "rule-set:Telegram,TikTok":
+    "rule-set:Telegram":
       - "https://8.8.8.8/dns-query#节点选择"
       - "https://1.1.1.1/dns-query#节点选择"
-    "rule-set:YouTube,Google":
+    "rule-set:TikTok":
+      - "https://8.8.8.8/dns-query#节点选择"
+      - "https://1.1.1.1/dns-query#节点选择"
+    "rule-set:TikTok-iOS":
+      - "https://8.8.8.8/dns-query#节点选择"
+      - "https://1.1.1.1/dns-query#节点选择"
+    "rule-set:YouTube":
+      - "https://8.8.8.8/dns-query#节点选择"
+      - "https://1.1.1.1/dns-query#节点选择"
+    "rule-set:Google":
       - "https://8.8.8.8/dns-query#节点选择"
       - "https://1.1.1.1/dns-query#节点选择"
 
@@ -199,6 +208,7 @@ rule-providers:
   AppleCN: {<<: *DomainMrs, path: ./rules/apple-cn.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/apple-cn.mrs}
   Microsoft: {<<: *DomainMrs, path: ./rules/microsoft.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/microsoft.mrs}
   TikTok: {<<: *DomainMrs, path: ./rules/tiktok.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/tiktok.mrs}
+  TikTok-iOS: {<<: *domainYaml, path: ./rules/tiktok-ios.yaml, url: https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/rules/tiktok-ios.yaml}
   China: {<<: *DomainMrs, path: ./rules/cn.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/cn.mrs}
 #  Foreign: {<<: *DomainMrs, path: ./rules/geolocation-!cn.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/geolocation-!cn.mrs}
   PT: {<<: *DomainMrs, path: ./rules/category-pt.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/category-pt.mrs}
@@ -283,6 +293,9 @@ rules:
   - RULE-SET,GameDownload-CN,全球直连
   - RULE-SET,Microsoft-CN,全球直连
   - RULE-SET,Apple,苹果服务
+  # iOS TikTok 优先拒绝 QUIC，使节点 UDP 不稳定时快速回退到 HTTPS/TCP。
+  - AND,((NETWORK,UDP),(DST-PORT,443),(RULE-SET,TikTok-iOS)),REJECT
+  - RULE-SET,TikTok-iOS,TikTok
   - RULE-SET,TikTok,TikTok
   - RULE-SET,China,全球直连
   - RULE-SET,ChinaSpeedtest,全球直连

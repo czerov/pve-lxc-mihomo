@@ -28,6 +28,7 @@ NEXUSBOX_PATCHED_REF="${NEXUSBOX_PATCHED_REF:-d3e3af4cc14615124d9bed57ee54de5c8b
 NEXUSBOX_PATCHED_BASE="${NEXUSBOX_PATCHED_BASE:-https://raw.githubusercontent.com/${NEXUSBOX_PATCHED_REPO}/${NEXUSBOX_PATCHED_REF}/bin}"
 NEXUSBOX_PATCHED_URL="${NEXUSBOX_PATCHED_URL:-}"
 NEXUSBOX_PATCHED_SHA256="${NEXUSBOX_PATCHED_SHA256:-}"
+TIKTOK_IOS_RULE_URL="${TIKTOK_IOS_RULE_URL:-https://raw.githubusercontent.com/${NEXUSBOX_PATCHED_REPO}/${NEXUSBOX_PATCHED_BRANCH}/rules/tiktok-ios.yaml}"
 MODE="${MODE:-auto}"
 INSTALL_PROFILE="${INSTALL_PROFILE:-unknown}"
 ROUTING_MODE="${ROUTING_MODE:-kdocs}"
@@ -588,6 +589,18 @@ download_url_with_fallback() {
   fi
 
   download_best_url "$output" "${urls[@]}"
+}
+
+install_project_rule_files() {
+  local config_file="$1" config_dir rule_file
+  grep -q '^  TikTok-iOS:' "$config_file" || return 0
+  config_dir="$(dirname "$config_file")"
+  rule_file="${config_dir}/rules/tiktok-ios.yaml"
+  mkdir -p "$(dirname "$rule_file")"
+  backup_file "$rule_file"
+  say "正在下载 TikTok iOS 补充规则"
+  download_url_with_fallback "$TIKTOK_IOS_RULE_URL" "$rule_file" || die "TikTok iOS 补充规则下载失败。"
+  [ -s "$rule_file" ] || die "TikTok iOS 补充规则内容为空。"
 }
 
 resolve_mihomo_version() {
@@ -1222,6 +1235,7 @@ EOF
   fi
   import_config_from_url "$CONFIG_FILE" "standalone"
   apply_routing_profile_to_config "$CONFIG_FILE" "standalone"
+  install_project_rule_files "$CONFIG_FILE"
   systemctl stop mihomo >/dev/null 2>&1 || true
   prepare_kdocs_dns_port
 
@@ -1298,6 +1312,7 @@ fix_nexusbox_core() {
 
   import_config_from_url "${NEXUSBOX_CONFIG_DIR}/config.yaml" "nexusbox"
   apply_routing_profile_to_config "${NEXUSBOX_CONFIG_DIR}/config.yaml" "nexusbox"
+  install_project_rule_files "${NEXUSBOX_CONFIG_DIR}/config.yaml"
   install_zashboard_ui
   install_geodata_files "$NEXUSBOX_CONFIG_DIR" 1
   setup_geodata_timer

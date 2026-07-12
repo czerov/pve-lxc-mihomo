@@ -159,6 +159,16 @@ ROUTING_MODE=gateway bash <(curl -fsSL https://gh-proxy.com/https://raw.githubus
 
 ## 常见问题
 
+### iPhone TikTok 一直加载
+
+最新默认配置会叠加 `TikTok-iOS` 域名集、独立代理 DNS，并拒绝 TikTok 的 QUIC `UDP/443` 以触发 TCP 回退。已有 NexusBox 可执行：
+
+```bash
+curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-tiktok-routing.sh | bash
+```
+
+更新后在 TikTok 分组选择新加坡、日本或美国节点，完全关闭 iPhone TikTok 后重新打开。香港节点、节点不支持目标地区、账号/SIM/App Store 地区限制都不是规则本身可以修复的问题。
+
 ### core.sock 不存在
 
 一般是核心没启动。先检查：
@@ -179,13 +189,13 @@ This program can only be run on AMD64 processors with v3 microarchitecture suppo
 
 ### apt 下载总是走坏代理
 
-脚本会用：
+检测到明确的 LXC 代理时，APT 会优先使用代理；代理失败后才回退直连。没有配置代理时会明确关闭 APT 代理：
 
 ```bash
 apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false ...
 ```
 
-绕过坏代理。如果你的网络必须走代理，可以在运行前设置：
+如果你的网络必须走代理，可以在运行前设置：
 
 ```bash
 export http_proxy=http://你的代理:端口

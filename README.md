@@ -129,6 +129,22 @@ bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-ins
 
 不要把包含私人订阅、节点或密钥的 `config.yaml` 直接提交到公开仓库。
 
+## iPhone TikTok 修复
+
+默认配置同时使用 MetaCubeX TikTok 规则和项目内的 `TikTok-iOS` 补充规则，覆盖 iOS App 常用的 `isnssdk.com`、`snssdk.com`、`byteintlapi.com`、`sgpstatp.com`、`ibyteimg.com`、`ttwebview.com` 等域名。TikTok、TikTok-iOS、Telegram、YouTube 和 Google 的 DNS 策略均按 Mihomo 官方格式拆成独立的 `rule-set:<名称>` 键。
+
+TikTok iOS 的 `UDP/443` 会先返回 `REJECT`，使 QUIC 快速回退到 HTTPS/TCP，避免所选机场节点不支持 UDP 时继续向后匹配并发生直连或分流错误。TikTok 分组建议选择新加坡、日本或美国节点，不建议使用香港节点。
+
+已有 NexusBox LXC 可以单独更新：
+
+```bash
+pct exec <CTID> -- bash -c 'curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-tiktok-routing.sh | bash'
+```
+
+执行后完全关闭 iPhone TikTok，再重新打开；必要时断开并重新连接 Wi-Fi。规则只能控制网络分流，节点 IP 地区、TikTok 账号地区、SIM 国家码和 App Store 版本仍可能影响可用性。
+
+参考：[Mihomo 路由规则](https://wiki.metacubex.one/config/rules/)、[Mihomo DNS](https://wiki.metacubex.one/config/dns/)、[Blackmatrix7 TikTok](https://github.com/blackmatrix7/ios_rule_script/tree/master/rule/Clash/TikTok)、[v2fly TikTok 域名](https://github.com/v2fly/domain-list-community/blob/master/data/tiktok)。
+
 如果不想导入默认配置，可以关闭：
 
 ```bash
