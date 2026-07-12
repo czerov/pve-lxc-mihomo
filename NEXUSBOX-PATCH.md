@@ -17,6 +17,8 @@
 - 修改或删除订阅时同步更新对应 provider，同时保留 raw YAML 中非 NexusBox 管理的自定义 provider。
 - 订阅更新失败时检查 Mihomo 返回状态和节点数量，并在订阅卡片显示明确错误，不再长期停留在“流量信息不可用”。
 - 日志页会加载 NexusBox 历史运行日志，同时继续接收 Mihomo 实时日志，默认显示 DEBUG 及以上级别。
+- 单条订阅可启用“通过节点选择更新”，由已可用的代理节点访问受限订阅地址，避免给第一订阅造成循环依赖。
+- 配置页在 NexusBox 或 Mihomo 刚重启时自动重试配置和 YAML 加载，不再依赖手动刷新。
 
 构建命令：
 
@@ -32,6 +34,6 @@ GOOS=linux GOARCH=arm64 go build -tags vue -ldflags="-s -w" -o nexusbox-linux-ar
 SHA256：
 
 ```text
-amd64  f2f14b37d4e050ff5b379e642699666b808de007759090187feecf35cf4ffe05
-arm64  b94089164998afde4170cbd0959a419915cf97856812389b02364cf97cd113e7
+amd64  51243c791e6b3ec277244e836cf494a29b3b93b94377631b971ee3f96737ddd2
+arm64  cfad3e4393894a8739b5dadc48a3ab4379021b5f7b2d76139d35a7ce30617b2a
 ```
