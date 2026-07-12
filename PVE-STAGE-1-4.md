@@ -210,8 +210,10 @@ exit 0
 第 5 阶段仍需要根据主路由型号处理。脚本结束时会提示：
 
 ```text
-方式 A：client gateway/DNS -> LXC_IP
-方式 B：client DNS -> LXC_IP，并添加 route 28.0.0.0/8 -> LXC_IP
+推荐方式 A：client gateway/DNS -> LXC_IP
+兼容方式 B：client DNS -> LXC_IP，并添加 route 28.0.0.0/8 -> LXC_IP
 ```
+
+方式 A 是 Telegram、TikTok、YouTube 等移动 App 的默认方案。方式 B 只覆盖 Fake-IP，Telegram 固定 DC IP、真实 IP、IPv6 和部分 UDP 可能绕过 LXC。
 
 如果主路由是 OpenWrt/iStoreOS/ImmortalWrt，后续可以继续加 `router-openwrt.sh` 做自动配置。

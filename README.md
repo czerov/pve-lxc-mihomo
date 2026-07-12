@@ -273,9 +273,15 @@ GH_PROXY=https://gh.llkk.cc bash <(curl -fsSL https://gh-proxy.com/https://raw.g
 
 ## 安装后主路由配置
 
-方式 A：把终端设备或主路由的网关/DNS 指向 LXC 容器 IP，例如 `192.168.1.9`。脚本会在 LXC 内配置 TCP 透明代理、DNS 转发和 NAT。
+### 方式 A（推荐）
 
-方式 B：保留原网关，只把终端设备 DNS 填 LXC 容器 IP，并在主路由添加 fake-ip 静态路由：
+把终端设备或主路由的网关和 DNS 都指向 LXC 容器 IP，例如 `192.168.1.9`。脚本会在 LXC 内配置 TCP 透明代理、DNS 转发和 NAT。
+
+该方式能够处理 Telegram 固定 DC IP，以及没有经过 Fake-IP DNS 查询的 App 连接。Telegram、TikTok、YouTube 等移动 App 应使用方式 A。NexusBox 中保持 TUN、TProxy 关闭即可使用脚本配置的透明代理链路。
+
+### 方式 B（兼容性有限，不推荐用于移动 App）
+
+保留原网关，只把终端设备 DNS 填 LXC 容器 IP，并在主路由添加 Fake-IP 静态路由：
 
 ```text
 目的网络：28.0.0.0
@@ -288,6 +294,8 @@ GH_PROXY=https://gh.llkk.cc bash <(curl -fsSL https://gh-proxy.com/https://raw.g
 ```text
 192.168.1.9
 ```
+
+方式 B 只会把 `28.0.0.0/8` Fake-IP 流量送到 LXC。Telegram 固定 DC IP、应用缓存的真实 IP、IPv6 和部分 UDP 流量不会命中该静态路由，可能出现网页正常但 Telegram 一直“连接中”的情况。
 
 ## 详细教程
 

@@ -992,8 +992,10 @@ print_summary() {
   [ -n "$LXC_PROXY_HTTP" ] && echo "安装时使用的 LXC 代理：$LXC_PROXY_HTTP"
   echo
   echo "第 5 阶段需要在主路由或终端设置："
-  echo "  方式 A：把客户端网关和 DNS 设置为 ${ip}"
-  echo "  方式 B：保留原网关，把 DNS 设置为 ${ip}，并添加静态路由 28.0.0.0/8 -> ${ip}"
+  echo "  推荐方式 A：把客户端网关和 DNS 都设置为 ${ip}"
+  echo "    适用于 Telegram、TikTok、YouTube 等移动 App"
+  echo "  兼容方式 B：保留原网关，把 DNS 设置为 ${ip}，并添加静态路由 28.0.0.0/8 -> ${ip}"
+  echo "    注意：Telegram 固定 IP、真实 IP、IPv6 和部分 UDP 可能绕过 LXC"
   echo "  客户端 DNS：${ip}"
   echo
   echo "安装日志：$LOG"
