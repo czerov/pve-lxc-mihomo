@@ -3,7 +3,7 @@
 `bin/nexusbox-linux-amd64` 和 `bin/nexusbox-linux-arm64` 基于
 [`Ladavian/NexusBox`](https://github.com/Ladavian/NexusBox) 提交
 `c96970d7622c5e3cd5a0b111870db13ba1b90af6` 构建，沿用上游 MIT License。
-安装脚本默认固定从本仓库提交 `d52e6852dceea7405fbc8b5477605cd37a40f183` 下载二进制，避免 CDN 缓存旧文件后触发 SHA256 不匹配。
+安装脚本默认固定从本仓库提交 `d3e3af4cc14615124d9bed57ee54de5c8bbd1c3f` 下载二进制，避免 CDN 缓存旧文件后触发 SHA256 不匹配。
 
 修补内容：
 
