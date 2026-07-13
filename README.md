@@ -11,6 +11,7 @@
 - 自动获取 Mihomo 最新版本，失败时使用稳定兜底版本
 - 可选择纯 Mihomo、自动判断、修复 NexusBox、从零安装 NexusBox
 - NexusBox 修补版兼容当前 Mihomo 热重载 API，解决 `Body invalid`
+- 提供仅替换 NexusBox 二进制的更新脚本，不覆盖配置或订阅
 - NexusBox 代理页支持 provider 节点测速，正常显示延迟或“超时”
 - 默认导入公开安全的 MSM 风格规则，保留 AI、Google、Telegram、Netflix、Apple、Microsoft、PT、游戏和 Speedtest 分组
 - 默认采用 KDocs 架构：TUN、DNS 53、Fake-IP `198.18.0.0/16`、IPv4/IPv6 转发、NAT 和 `/etc/rc.local` 自启
@@ -179,6 +180,16 @@ USE_EXISTING=1 CTID=109 bash <(curl -fsSL https://gh-proxy.com/https://raw.githu
 ```
 
 脚本会自动读取 `/etc/pve/lxc/109.conf` 里的 `net0`，识别 LXC IP、网桥、网关。如果容器是 DHCP，会启动容器后从容器内部自动读取当前 IP。
+
+## 仅更新 NexusBox 修补版
+
+已有 NexusBox 不需要重装 LXC、Mihomo 或规则。下面的命令只备份并替换 `/opt/nexusbox/nexusbox`，不会修改 `config.yaml`、`nexusbox.json` 或机场订阅；新版本启动或热重载验证失败时会自动恢复旧二进制：
+
+```bash
+pct exec 109 -- bash -c 'curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-nexusbox-patch.sh | bash'
+```
+
+该修补版用于解决添加第二个及后续订阅后，保存应用时报 `400 Body invalid` 的问题。
 
 ## LXC 代理助手
 

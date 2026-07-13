@@ -3,11 +3,12 @@
 `bin/nexusbox-linux-amd64` 和 `bin/nexusbox-linux-arm64` 基于
 [`Ladavian/NexusBox`](https://github.com/Ladavian/NexusBox) 提交
 `c96970d7622c5e3cd5a0b111870db13ba1b90af6` 构建，沿用上游 MIT License。
-安装脚本默认固定从本仓库提交 `d3e3af4cc14615124d9bed57ee54de5c8bbd1c3f` 下载二进制，避免 CDN 缓存旧文件后触发 SHA256 不匹配。
+安装脚本默认固定从本仓库提交 `a59ce608bb2ba552898f1a536ef8c4a5b940b908` 下载二进制，避免 CDN 缓存旧文件后触发 SHA256 不匹配。
 
 修补内容：
 
 - 为当前 Mihomo 的 `PUT /configs?force=true` 请求补充 `payload` 字段。
+- Unix socket 请求失败回退 TCP 控制端口时重新创建完整请求体，修复添加第二个订阅时偶发 `400 Body invalid`。
 - 增加 NexusBox 的 `/providers/proxies` 转发接口，供代理页读取 provider 节点及测速历史。
 - 保留 Mihomo 节点测速接口的 HTTP 错误状态，不再把 `404` 当作成功结果。
 - 代理页加载时合并 provider 节点历史，正常显示延迟或“超时”。
@@ -36,6 +37,6 @@ GOOS=linux GOARCH=arm64 go build -tags vue -ldflags="-s -w" -o nexusbox-linux-ar
 SHA256：
 
 ```text
-amd64  eb732ad143c6cf3722949cbb415f55d275f11dcc36ef2dea2dbdf9658871ec16
-arm64  ad3ea2abb9ca80fbea19e7a786696de6a379bb69853a9373eccfd739850ba03c
+amd64  443af7d019f92459cb692c86cf0161a7251c240c3a9344831657a3533b6e3408
+arm64  e1aad8f69667dd1f2c145ef2c93d6d6663fd5b1f8a9bbd28e2914ad190bc707a
 ```
