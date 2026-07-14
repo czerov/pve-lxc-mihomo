@@ -232,10 +232,11 @@ prompt_choices() {
       4)
         LXC_INSTALL_MODE="nexusbox-install"
         if [ -z "$NEXUSBOX_INSTALL_URL" ]; then
-          printf "NexusBox 安装脚本地址 [默认: %s]: " "$NEXUSBOX_DEFAULT_INSTALL_URL"
-          read -r NEXUSBOX_INSTALL_URL
+          NEXUSBOX_INSTALL_URL="$NEXUSBOX_DEFAULT_INSTALL_URL"
+          say "NexusBox 将使用官方安装脚本：$NEXUSBOX_INSTALL_URL"
+        else
+          say "NexusBox 将使用自定义安装脚本：$NEXUSBOX_INSTALL_URL"
         fi
-        NEXUSBOX_INSTALL_URL="${NEXUSBOX_INSTALL_URL:-$NEXUSBOX_DEFAULT_INSTALL_URL}"
         ;;
       *) die "无效安装模式选择: $install_choice" ;;
     esac

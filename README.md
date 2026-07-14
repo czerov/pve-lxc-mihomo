@@ -43,6 +43,7 @@ bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve-lxc-mihomo@main/pve-ins
 - 自动模式：已有 LXC 时自动判断 NexusBox；新建 LXC 时自动安装完整 NexusBox
 - 修复已有 NexusBox 核心
 - 从零安装 NexusBox UI 后修复核心，默认使用 Ladavian/NexusBox 官方安装脚本，并自动尝试 CDN / GitHub 加速源
+- 选择安装模式 4 后自动采用官方 NexusBox 安装地址，不再要求额外按一次回车；自定义地址可通过 `NEXUSBOX_INSTALL_URL` 指定
 - NexusBox 模式会替换为仓库内修补版 NexusBox 二进制，修复当前 mihomo 热重载 `Body invalid`，并让代理页正确读取 provider 节点延迟、显示测速结果或“超时”
 - 路由架构：KDocs 高性能模式、完整网关模式
 - LXC 代理：关闭、自动探测、手动输入
