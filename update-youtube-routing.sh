@@ -43,13 +43,13 @@ trap 'restore_backup' ERR
 grep -q '^  nameserver-policy:' "$CONFIG_FILE" ||
   die "当前配置没有 nameserver-policy，请先更新到项目的 Telegram/TikTok DNS 修复版本。"
 
-if ! grep -q 'name: YouTube,' "$CONFIG_FILE"; then
-  grep -q '^  - {name: 谷歌服务,' "$CONFIG_FILE" ||
-    die "找不到“谷歌服务”代理组，无法安全插入 YouTube 组。"
-fi
+grep -q '^  - {name: 谷歌服务,' "$CONFIG_FILE" ||
+  die "找不到“谷歌服务”代理组。"
 
 grep -q 'RULE-SET,YouTube,' "$CONFIG_FILE" ||
   die "找不到 YouTube 规则。"
+grep -q 'RULE-SET,Google,' "$CONFIG_FILE" ||
+  die "找不到 Google 规则。"
 
 cp -a "$CONFIG_FILE" "$BACKUP"
 say "已备份：$BACKUP"
@@ -60,14 +60,17 @@ grep -q 'name: YouTube,' "$CONFIG_FILE" && group_present=1
 awk -v group_present="$group_present" '
 function print_youtube_dns() {
   print "    \"rule-set:YouTube\":"
-  print "      - \"https://8.8.8.8/dns-query#节点选择\""
-  print "      - \"https://1.1.1.1/dns-query#节点选择\""
+  print "      - \"https://8.8.8.8/dns-query#YouTube\""
+  print "      - \"https://1.1.1.1/dns-query#YouTube\""
   print "    \"rule-set:Google\":"
-  print "      - \"https://8.8.8.8/dns-query#节点选择\""
-  print "      - \"https://1.1.1.1/dns-query#节点选择\""
+  print "      - \"https://8.8.8.8/dns-query#谷歌服务\""
+  print "      - \"https://1.1.1.1/dns-query#谷歌服务\""
 }
 function print_youtube_group() {
   print "  - {name: YouTube, !!merge <<: *UrlTest, proxies: [], filter: *FilterAll, exclude-filter: \"(?i)(hy2|hysteria2).*(港|hk|hong|hkg).*直连\", interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png\"}"
+}
+function print_google_group() {
+  print "  - {name: 谷歌服务, !!merge <<: *UrlTest, proxies: [], filter: *FilterAll, exclude-filter: \"(?i)(hy2|hysteria2).*(港|hk|hong|hkg).*直连\", interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png\"}"
 }
 BEGIN {
   in_dns = 0
@@ -75,6 +78,7 @@ BEGIN {
   skip_dns_values = 0
   dns_written = 0
   group_written = 0
+  google_written = 0
 }
 {
   if ($0 ~ /^dns:[[:space:]]*$/) {
@@ -113,6 +117,20 @@ BEGIN {
     print "  - RULE-SET,YouTube,YouTube"
     next
   }
+  if ($0 ~ /^  - RULE-SET,Google,/) {
+    print "  - RULE-SET,Google,谷歌服务"
+    next
+  }
+
+  if ($0 ~ /^  - \{name: 谷歌服务,/) {
+    print_google_group()
+    google_written = 1
+    if (!group_present && !group_written) {
+      print_youtube_group()
+      group_written = 1
+    }
+    next
+  }
 
   if ($0 ~ /^  - \{name: YouTube,/) {
     print_youtube_group()
@@ -121,18 +139,13 @@ BEGIN {
   }
 
   print
-
-  if (!group_present && !group_written && $0 ~ /^  - \{name: 谷歌服务,/) {
-    print_youtube_group()
-    group_written = 1
-  }
 }
 END {
   if (in_policy && !dns_written) {
     print_youtube_dns()
     dns_written = 1
   }
-  if (!dns_written || !group_written) {
+  if (!dns_written || !group_written || !google_written) {
     exit 42
   }
 }
@@ -142,14 +155,22 @@ mv "$TMP" "$CONFIG_FILE"
 
 grep -q '^    "rule-set:YouTube":' "$CONFIG_FILE" || die "YouTube DNS 策略写入失败。"
 grep -q '^    "rule-set:Google":' "$CONFIG_FILE" || die "Google DNS 策略写入失败。"
+grep -q 'dns-query#YouTube' "$CONFIG_FILE" || die "YouTube DNS 代理组写入失败。"
+grep -q 'dns-query#谷歌服务' "$CONFIG_FILE" || die "Google DNS 代理组写入失败。"
 grep -q 'name: YouTube,' "$CONFIG_FILE" ||
   die "YouTube 自动测速组写入失败。"
 grep -q 'name: YouTube,.*exclude-filter:.*hy2.*hysteria2.*直连' "$CONFIG_FILE" ||
   die "YouTube Hysteria2 香港直连节点排除规则写入失败。"
 grep -q 'name: YouTube,.*proxies: \[\]' "$CONFIG_FILE" ||
   die "YouTube DIRECT 排除规则写入失败。"
+grep -q 'name: 谷歌服务,.*exclude-filter:.*hy2.*hysteria2.*直连' "$CONFIG_FILE" ||
+  die "Google Hysteria2 香港直连节点排除规则写入失败。"
+grep -q 'name: 谷歌服务,.*proxies: \[\]' "$CONFIG_FILE" ||
+  die "Google DIRECT 排除规则写入失败。"
 grep -q '^  - RULE-SET,YouTube,YouTube$' "$CONFIG_FILE" ||
   die "YouTube 规则目标修改失败。"
+grep -q '^  - RULE-SET,Google,谷歌服务$' "$CONFIG_FILE" ||
+  die "Google 规则目标修改失败。"
 
 "$CORE_BIN" -t -d "$(dirname "$CONFIG_FILE")"
 say "Mihomo 配置校验通过。"
@@ -168,5 +189,5 @@ curl -fsS --unix-socket "$CORE_SOCKET" \
   -X DELETE 'http://localhost/connections' >/dev/null
 
 trap - ERR
-say "YouTube 自动测速、境外 DNS、手机 IPv4 优先和 Hysteria2 香港直连排除策略已生效。"
-say "请完全关闭手机 YouTube 后重新打开；必要时断开并重新连接 Wi-Fi。"
+say "YouTube/Google 自动测速、专用境外 DNS、DIRECT 与 Hysteria2 香港直连排除策略已生效。"
+say "请完全关闭 YouTube/Google 应用后重新打开；必要时断开并重新连接 Wi-Fi。"

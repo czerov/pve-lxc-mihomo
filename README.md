@@ -13,7 +13,7 @@
 - NexusBox 修补版兼容当前 Mihomo 热重载 API，解决 `Body invalid`
 - 提供仅替换 NexusBox 二进制的更新脚本，不覆盖配置或订阅
 - NexusBox 代理页支持 provider 节点测速，正常显示延迟或“超时”
-- YouTube 自动测速使用全部合格机场节点，不固定国家顺序，并排除 `DIRECT` 与 Hysteria2/`hy2` 香港直连节点
+- YouTube 与 Google 使用独立自动测速组，不固定国家顺序，并排除 `DIRECT` 与 Hysteria2/`hy2` 香港直连节点
 - 默认导入公开安全的 MSM 风格规则，保留 AI、Google、Telegram、Netflix、Apple、Microsoft、PT、游戏和 Speedtest 分组
 - 默认采用 KDocs 架构：TUN、DNS 53、Fake-IP `198.18.0.0/16`、IPv4/IPv6 转发、NAT 和 `/etc/rc.local` 自启
 - 自动下载 Zashboard 官方完整字体包到 `/opt/config/ui/zash`

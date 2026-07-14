@@ -154,11 +154,11 @@ dns:
       - "https://8.8.8.8/dns-query#节点选择"
       - "https://1.1.1.1/dns-query#节点选择"
     "rule-set:YouTube":
-      - "https://8.8.8.8/dns-query#节点选择"
-      - "https://1.1.1.1/dns-query#节点选择"
+      - "https://8.8.8.8/dns-query#YouTube"
+      - "https://1.1.1.1/dns-query#YouTube"
     "rule-set:Google":
-      - "https://8.8.8.8/dns-query#节点选择"
-      - "https://1.1.1.1/dns-query#节点选择"
+      - "https://8.8.8.8/dns-query#谷歌服务"
+      - "https://1.1.1.1/dns-query#谷歌服务"
 
 proxies: []
 
@@ -167,7 +167,7 @@ proxy-groups:
   - {name: 手动切换, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Clubhouse.png', proxies: [ 台湾节点, 香港节点, 全球直连, 日本节点, 新加坡节点, 美国节点, 韩国节点, 省流节点, 高级节点, 游戏节点, 机场节点]}
   - {name: 漏网之鱼, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Unlock.png', proxies: [节点选择, 全球直连, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 省流节点, 高级节点, 手动切换, 机场节点]}
   - {name: 网络测试, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Speedtest.png', proxies: [ 全球直连, 节点选择, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 省流节点, 高级节点, 手动切换, 机场节点]}
-  - {name: 谷歌服务, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png', proxies: [节点选择, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 手动切换]}
+  - {name: 谷歌服务, !!merge <<: *UrlTest, proxies: [], filter: *FilterAll, exclude-filter: '(?i)(hy2|hysteria2).*(港|hk|hong|hkg).*直连', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png'}
   - {name: YouTube, !!merge <<: *UrlTest, proxies: [], filter: *FilterAll, exclude-filter: '(?i)(hy2|hysteria2).*(港|hk|hong|hkg).*直连', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png'}
   - {name: 人工智能, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/AI.png', proxies: [美国节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 香港节点, 省流节点, 高级节点, 手动切换, 全球直连, 机场节点]}
   - {name: 游戏平台, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Game.png', proxies: [ 节点选择, 全球直连, 高级节点, 游戏节点]}
