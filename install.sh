@@ -902,6 +902,34 @@ curl() {\
   fi
 }
 
+apt_install_direct_with_retry() {
+  local pkgs=("$@")
+  local direct_opts=(
+    -o Acquire::http::Proxy=false
+    -o Acquire::https::Proxy=false
+    -o Acquire::Retries=3
+  )
+  local refresh_opts=(
+    "${direct_opts[@]}"
+    -o Acquire::ForceIPv4=true
+    -o Acquire::http::No-Cache=true
+    -o Acquire::https::No-Cache=true
+  )
+
+  if ! apt-get "${direct_opts[@]}" update; then
+    say "APT 直连更新失败，强制 IPv4 并绕过缓存重试。"
+    apt-get "${refresh_opts[@]}" update
+  fi
+
+  if apt-get "${direct_opts[@]}" install -y "${pkgs[@]}"; then
+    return 0
+  fi
+
+  say "APT 依赖下载失败，可能是镜像索引与软件包不同步；正在强制刷新索引后重试。"
+  apt-get "${refresh_opts[@]}" update
+  apt-get "${refresh_opts[@]}" install -y --fix-missing "${pkgs[@]}"
+}
+
 apt_install_if_missing() {
   local pkgs=()
   for p in "$@"; do
@@ -918,23 +946,21 @@ apt_install_if_missing() {
   export https_proxy="${https_proxy:-}"
   export HTTP_PROXY="${HTTP_PROXY:-}"
   export HTTPS_PROXY="${HTTPS_PROXY:-}"
+  export DEBIAN_FRONTEND=noninteractive
 
   if [ -n "${http_proxy}${https_proxy}${HTTP_PROXY}${HTTPS_PROXY}" ] ||
     grep -Eq 'Acquire::(http|https)::Proxy' /etc/apt/apt.conf.d/99proxy 2>/dev/null; then
     say "检测到安装代理，APT 优先使用当前代理"
-    if ! apt-get update; then
-      say "APT 代理更新失败，改用直连重试。"
-      apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false update
+    if apt-get -o Acquire::Retries=3 update &&
+      apt-get -o Acquire::Retries=3 install -y "${pkgs[@]}"; then
+      return 0
     fi
-    if ! apt-get install -y "${pkgs[@]}"; then
-      say "APT 代理安装失败，改用直连重试。"
-      apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false install -y "${pkgs[@]}"
-    fi
+    say "APT 代理安装失败，改用直连并刷新索引重试。"
+    apt_install_direct_with_retry "${pkgs[@]}"
     return 0
   fi
 
-  apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false update
-  apt-get -o Acquire::http::Proxy=false -o Acquire::https::Proxy=false install -y "${pkgs[@]}"
+  apt_install_direct_with_retry "${pkgs[@]}"
 }
 
 prepare_core_binary() {

@@ -13,6 +13,7 @@
 - NexusBox 修补版兼容当前 Mihomo 热重载 API，解决 `Body invalid`
 - 提供仅替换 NexusBox 二进制的更新脚本，不覆盖配置或订阅
 - NexusBox 代理页支持 provider 节点测速，正常显示延迟或“超时”
+- YouTube 自动测速使用全部合格机场节点，不固定国家顺序，并排除 `DIRECT` 与 Hysteria2/`hy2` 香港直连节点
 - 默认导入公开安全的 MSM 风格规则，保留 AI、Google、Telegram、Netflix、Apple、Microsoft、PT、游戏和 Speedtest 分组
 - 默认采用 KDocs 架构：TUN、DNS 53、Fake-IP `198.18.0.0/16`、IPv4/IPv6 转发、NAT 和 `/etc/rc.local` 自启
 - 自动下载 Zashboard 官方完整字体包到 `/opt/config/ui/zash`
@@ -109,6 +110,8 @@ CT_ROOTFS_STORAGE=local bash <(curl -fsSL https://cdn.jsdelivr.net/gh/czerov/pve
 KDocs 模式会停止 `systemd-resolved`，让 Mihomo 直接监听 `0.0.0.0:53`。完整网关模式使用 `0.0.0.0:6666`，并自动把客户端访问的 `53/tcp` 和 `53/udp` 转到实际 DNS 端口。
 
 无代理也可以尝试一键安装。国内网络建议从 `pve-install-cn.sh` 启动，它会默认启用 `PREFER_CN_ACCEL=1`，优先使用 jsDelivr、`gh-proxy.com` 等国内可用源，raw GitHub 只作为最后兜底。Mihomo 核心、NexusBox 和 `geoip.dat` / `geosite.dat` / `country.mmdb` 都带多源回退；GEO 文件还会检查下载大小，避免把错误页面当成数据库。若选择自动或手动 LXC 代理，APT 和后续下载会优先使用该代理，代理失败才回退直连。
+
+Debian 模板自带的软件包索引过期或镜像正在同步时，APT 可能出现 `404 Not Found`。安装脚本会自动改用直连、强制刷新索引、切换 IPv4 并使用 `--fix-missing` 重试，这类错误与 AMD 300U 或 Mihomo 核心架构无关。
 
 `pve-install-cn.sh` 入口会优先拉取 GitHub raw / GitHub 加速源的新脚本，CDN 只作为兜底，避免 `cdn.jsdelivr.net @main` 缓存旧版脚本导致菜单或逻辑不是最新。
 
