@@ -231,6 +231,9 @@ rule-providers:
   ChinaIP: {<<: *IPcidrMrs, path: ./rules/cnip.mrs, url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/cn.mrs}
 
 rules:
+  # 指定域名直连
+  - DOMAIN,metoo.kdns.fr,DIRECT
+  - DOMAIN,czerov.kdns.fr,DIRECT
   # 回家直连
   - IP-CIDR,192.168.7.0/24,DIRECT,no-resolve
   - IP-CIDR,192.168.31.0/24,DIRECT,no-resolve
