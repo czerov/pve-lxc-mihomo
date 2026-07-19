@@ -9,9 +9,9 @@ DRY_RUN="${DRY_RUN:-0}"
 FILTER='exclude-filter: "(?i)(直连|direct)"'
 STABLE_PROXY_NAME='稳定优选'
 URLTEST_LINE='UrlTest: &UrlTest {type: url-test, proxies: [DIRECT], interval: 300, tolerance: 50, lazy: false, url: '\''https://www.gstatic.com/generate_204'\'', disable-udp: false, timeout: 5000, max-failed-times: 2, hidden: true, include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: "(?i)(直连|direct)"}'
-STABLE_GROUP_LINE="  - {name: 稳定优选, type: fallback, proxies: [香港节点, 美国节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}"
-GOOGLE_GROUP_LINE="  - {name: 谷歌服务, type: fallback, proxies: [香港节点, 美国节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png'}"
-YOUTUBE_GROUP_LINE="  - {name: YouTube, type: fallback, proxies: [香港节点, 美国节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png'}"
+STABLE_GROUP_LINE="  - {name: 稳定优选, type: fallback, proxies: [香港节点, 美国节点, 台湾节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}"
+GOOGLE_GROUP_LINE="  - {name: 谷歌服务, type: fallback, proxies: [香港节点, 美国节点, 台湾节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png'}"
+YOUTUBE_GROUP_LINE="  - {name: YouTube, type: fallback, proxies: [香港节点, 美国节点, 台湾节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png'}"
 CHROME_RULE_MARKER='- DOMAIN,chromewebstore.google.com,美国节点'
 BACKUP="${CONFIG_FILE}.bak-$(date +%Y%m%d-%H%M%S)"
 
@@ -139,7 +139,7 @@ ensure_routing_groups() {
 
   cp -f "$temp_file" "$CONFIG_FILE"
   rm -f "$temp_file"
-  say "已建立香港优先、美国备用的稳定优选分组。"
+  say "已建立香港优先、美国和台湾依次备用的稳定优选分组。"
 }
 
 ensure_chrome_store_rules() {
@@ -286,7 +286,7 @@ if ! select_stable_proxies; then
 fi
 
 say "更新完成：区域节点每 5 分钟测速，并排除名称含“直连/direct”的节点。"
-say "稳定优选仅使用香港和美国节点，香港不可用时自动切换到美国。"
+say "稳定优选仅使用香港、美国和台湾节点，并按此顺序自动故障接管。"
 say "Chrome Web Store 已固定使用美国节点。"
 if [ "$DRY_RUN" = "1" ]; then
   say "DRY_RUN=1，运行中的代理组未执行切换。"
