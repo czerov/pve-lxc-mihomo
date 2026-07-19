@@ -291,6 +291,13 @@ rules:
   - RULE-SET,AIDomain,人工智能
   - RULE-SET,AIChat,人工智能
   - RULE-SET,YouTube,YouTube
+  # Chrome Web Store / CRX
+  - DOMAIN,chromewebstore.google.com,美国节点
+  - DOMAIN,chrome.google.com,美国节点
+  - DOMAIN,chromewebstore.googleapis.com,美国节点
+  - DOMAIN,clients2.google.com,美国节点
+  - DOMAIN,clients2.googleusercontent.com,美国节点
+  - DOMAIN,update.googleapis.com,美国节点
   - RULE-SET,Google,谷歌服务
   - RULE-SET,AppleCN,全球直连
   - RULE-SET,GameDownload-CN,全球直连
