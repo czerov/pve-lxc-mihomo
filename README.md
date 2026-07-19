@@ -103,7 +103,7 @@ pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https:
 
 - 排除名称含“直连/direct”的自动测速节点。
 - 将区域测速调整为每 5 分钟执行，降低大量订阅节点的探测压力。
-- 新增“稳定优选”：香港节点优先，失效时自动切换到美国节点。
+- 新增“稳定优选”：仅使用香港、美国和台湾节点，并按此顺序自动故障接管。
 - 让 Google、YouTube、人工智能、Telegram 和默认代理使用“稳定优选”。
 - 将 Chrome Web Store 和扩展更新流量固定到美国节点。
 - 自动清理历史版本可能遗留在 `proxy-providers` 后的重复 Chrome/Google 规则。
@@ -136,7 +136,7 @@ pct exec 109 -- bash -c "ss -lntup | grep -E '(:53|:7890|:9090|:18080)'"
 - NexusBox 添加订阅时使用“融合/merge”模式，不要使用“切换/switch”模式覆盖项目规则。
 - 不要将包含私人订阅地址、节点、密码或密钥的 `config.yaml` 提交到公开仓库。
 - 更新脚本默认保留带时间戳的配置或二进制备份。
-- Chrome Web Store 走美国节点；Codex/OpenAI 走“人工智能 → 稳定优选”（香港优先、美国备用）。
+- Chrome Web Store 走美国节点；Codex/OpenAI 走“人工智能 → 稳定优选”（香港优先，美国、台湾依次备用）。
 
 ## 文档
 
