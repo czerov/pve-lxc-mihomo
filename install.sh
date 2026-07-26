@@ -745,7 +745,9 @@ import_config_from_url() {
   backup_file "$target"
   cp "$downloaded" "$target"
 
-  set_yaml_scalar "$target" "mixed-port" "7890"
+  set_yaml_scalar "$target" "port" "7890"
+  set_yaml_scalar "$target" "socks-port" "7891"
+  set_yaml_scalar "$target" "mixed-port" "0"
   set_yaml_scalar "$target" "allow-lan" "true"
   set_yaml_scalar "$target" "external-controller" "'0.0.0.0:9090'"
   if [ "$profile" = "nexusbox" ]; then

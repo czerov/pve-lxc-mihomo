@@ -129,6 +129,16 @@ pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https:
 - 校验并热重载配置，失败时恢复备份。
 - 幂等更新，可重复执行而不会重复添加规则。
 
+## 已有容器更新高性能 TUN
+
+只把现有配置更新为 `System` TUN，并保留 NexusBox 中的订阅、节点和规则：
+
+```bash
+pct exec <CTID> -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-system-tun.sh | bash'
+```
+
+脚本会备份当前 YAML、修复重复监听端口、完整重启核心并验证 TUN；若 `System` 无法启动，会自动回退 `gVisor`。在 LXC 容器内部执行时，去掉前面的 `pct exec <CTID> -- bash -c` 即可。
+
 ## 其他维护脚本
 
 仅更新 NexusBox 修补版：
