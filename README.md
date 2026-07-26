@@ -77,6 +77,12 @@ bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/
 
 切换 TUN 协议栈后应停止再启动核心，不能只做配置热重载；否则旧 TUN 设备未释放时可能出现 `device or resource busy`。
 
+### 爱快源 IP 白名单模式（可选）
+
+爱快可以用一条名为 `MihomoHTTPS专用` 的端口分流规则，把源地址列表内设备的全部 IPv4 TCP/UDP 转发到 LXC。设备继续自动获取原网关和 DHCP 默认 DNS，不需要单独填写 LXC DNS；加入源地址列表即使用 Mihomo，移除后即恢复普通网络。
+
+该规则的源端口和目的端口都必须留空，不能只填写 `443`。详细配置、严格白名单要求和 IPv6 限制见 [爱快源 IP 白名单全流量模式](IKUAI-WHITELIST.md)。
+
 ### 完整网关模式
 
 ```bash
@@ -170,5 +176,6 @@ pct exec 109 -- bash -c "ss -lntup | grep -E '(:53|:7890|:9090|:18080)'"
 ## 文档
 
 - [详细安装与主路由配置](GUIDE.md)
+- [爱快源 IP 白名单全流量模式](IKUAI-WHITELIST.md)
 - [PVE 安装阶段说明](PVE-STAGE-1-4.md)
 - [NexusBox 修补版说明](NEXUSBOX-PATCH.md)

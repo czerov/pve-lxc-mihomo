@@ -1307,6 +1307,12 @@ print_summary() {
       echo "    警告：未检测到 LXC IPv6 链路本地地址，无法生成 Telegram IPv6 路由。"
     fi
     echo "    限制：未补充的真实 IP 和部分 UDP 仍可能绕过 LXC"
+    echo "    爱快可选源 IP 白名单模式（替代以上客户端 DNS 和静态路由设置）："
+    echo "      端口分流名称：MihomoHTTPS专用"
+    echo "      下一跳：${ip}，协议：TCP+UDP，源地址：允许使用 Mihomo 的设备 IP"
+    echo "      源端口和目的端口均留空；目的地址反向排除常见私网段"
+    echo "      单设备 DHCP 网关/DNS 留空，DHCP 服务端使用公网 IPv4 DNS"
+    echo "      严格白名单时停用全局 198.18.0.0/16 和 Telegram 补充静态路由"
   else
     echo "  完整网关模式："
     echo "    客户端网关：${ip}"

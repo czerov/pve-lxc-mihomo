@@ -421,6 +421,22 @@ set_yaml_section_scalar() {
   mv "$tmp" "$file"
 }
 
+yaml_section_has_key() {
+  local file="$1" section="$2" key="$3"
+  awk -v section="$section" -v key="$key" '
+    $0 ~ "^" section ":[[:space:]]*$" { in_section=1; next }
+    in_section && /^[^[:space:]#]/ { exit }
+    in_section && $0 ~ "^[[:space:]]+" key ":[[:space:]]*" { found=1; exit }
+    END { exit found ? 0 : 1 }
+  ' "$file"
+}
+
+ensure_yaml_section_scalar() {
+  local file="$1" section="$2" key="$3" value="$4"
+  yaml_section_has_key "$file" "$section" "$key" ||
+    set_yaml_section_scalar "$file" "$section" "$key" "$value"
+}
+
 apply_routing_profile_to_config() {
   local file="$1" profile="${2:-}"
   if routing_mode_is_kdocs; then
@@ -430,6 +446,7 @@ apply_routing_profile_to_config() {
     set_yaml_section_scalar "$file" "tun" "auto-route" "true"
     set_yaml_section_scalar "$file" "tun" "auto-detect-interface" "true"
     set_yaml_section_scalar "$file" "tun" "strict-route" "true"
+    ensure_yaml_section_scalar "$file" "tun" "dns-hijack" "[any:53, tcp://any:53]"
     set_yaml_section_scalar "$file" "dns" "listen" "0.0.0.0:53"
     set_yaml_section_scalar "$file" "dns" "ipv6" "false"
     set_yaml_section_scalar "$file" "dns" "enhanced-mode" "fake-ip"

@@ -125,6 +125,25 @@ DNS：LXC 容器 IP，例如 192.168.1.9
 
 并关闭“允许 ICMP 重定向”。KDocs 模式会自动启用 Mihomo TUN，NexusBox 中不需要再打开 TProxy。手动切换 TUN 栈后应停止再启动核心，不要直接热重载 TUN 配置。
 
+### 爱快源 IP 白名单全流量模式
+
+如果只希望指定设备使用 Mihomo，并且不想逐台设置网关和 DNS，可在爱快 `端口分流` 中创建 `MihomoHTTPS专用`：
+
+```text
+分流方式：下一跳网关
+下一跳：LXC IP
+协议：TCP+UDP
+优先级：5
+源地址：允许使用 Mihomo 的设备 IP，关闭反向匹配
+目的地址：反向排除 10.0.0.0/8、172.16.0.0/12、192.168.0.0/16、127.0.0.0/8
+源端口：留空
+目的端口：留空
+```
+
+设备只需固定 DHCP 地址，单设备网关和 DNS 字段留空。爱快 DHCP 服务端应下发公网 IPv4 DNS，使白名单设备的 DNS 请求也能通过该规则进入 Mihomo。以后只需维护 `MihomoHTTPS专用` 的源地址列表。
+
+该方案会让白名单设备的全部 IPv4 TCP/UDP 经过 LXC，不再具有 KDocs 模式“国内流量物理绕过 LXC”的容灾优势。严格白名单模式还应停用全局 `198.18.0.0/16` 和 Telegram 补充静态路由，避免非白名单设备从其他路径进入 Mihomo。完整步骤见 [IKUAI-WHITELIST.md](IKUAI-WHITELIST.md)。
+
 该模式默认只覆盖 Fake-IP。爱快用户可将以下 Telegram IPv4 网段的下一跳设置为 LXC IP，使固定 DC IP 进入 Mihomo：
 
 ```text
@@ -171,7 +190,7 @@ curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc
 
 更新脚本也会移除旧版的 TikTok UDP 拒绝规则。更新后在 TikTok 分组选择确认支持 UDP 且真实连接正常的新加坡、日本或美国节点，再完全关闭 iPhone TikTok 后重新打开。仅测速正常并不代表节点可用；如果日志出现 `503 Service Unavailable`，请更换到另一家订阅的节点。
 
-如果日志已显示 `api16-core.tiktokv.com` 或 `api22-core.tiktokv.com` 正确走 TikTok 节点，但 App 仍提示“无网络连接”，先在同一手机上用本地 VPN 客户端和同一条节点做对照。若本地 VPN 可以正常使用，说明节点和 SIM 不是主要问题，应排查 KDocs 模式未接管的固定 IP、IPv6、加密 DNS 或其他 UDP 流量，并为该终端改用能够接管完整 TCP/UDP 的网关方案。若本地 VPN 同样失败，再检查设备地区；TikTok 会结合 SIM 卡地区、出口 IP 和系统设置判断位置，开启飞行模式或关闭蜂窝数据不一定会隐藏已安装 SIM/eSIM 的归属地区。
+如果日志已显示 `api16-core.tiktokv.com` 或 `api22-core.tiktokv.com` 正确走 TikTok 节点，但 App 仍提示“无网络连接”，先在同一手机上用本地 VPN 客户端和同一条节点做对照。若本地 VPN 可以正常使用，说明节点和 SIM 不是主要问题，应排查 KDocs 模式未接管的固定 IP、IPv6、加密 DNS 或其他 UDP 流量，并为该终端改用 [爱快源 IP 白名单全流量模式](IKUAI-WHITELIST.md) 或完整网关模式。若本地 VPN 同样失败，再检查设备地区；TikTok 会结合 SIM 卡地区、出口 IP 和系统设置判断位置，开启飞行模式或关闭蜂窝数据不一定会隐藏已安装 SIM/eSIM 的归属地区。
 
 ### core.sock 不存在
 

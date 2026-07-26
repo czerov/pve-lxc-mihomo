@@ -58,6 +58,22 @@ set_yaml_section_scalar() {
   mv "$tmp" "$file"
 }
 
+yaml_section_has_key() {
+  local file="$1" section="$2" key="$3"
+  awk -v section="$section" -v key="$key" '
+    $0 ~ "^" section ":[[:space:]]*$" { in_section=1; next }
+    in_section && /^[^[:space:]#]/ { exit }
+    in_section && $0 ~ "^[[:space:]]+" key ":[[:space:]]*" { found=1; exit }
+    END { exit found ? 0 : 1 }
+  ' "$file"
+}
+
+ensure_yaml_section_scalar() {
+  local file="$1" section="$2" key="$3" value="$4"
+  yaml_section_has_key "$file" "$section" "$key" ||
+    set_yaml_section_scalar "$file" "$section" "$key" "$value"
+}
+
 detect_tun_stack() {
   awk '
     /^tun:[[:space:]]*$/ { in_tun=1; next }
@@ -158,6 +174,7 @@ set_yaml_section_scalar "$CONFIG_FILE" tun device Meta
 set_yaml_section_scalar "$CONFIG_FILE" tun auto-route true
 set_yaml_section_scalar "$CONFIG_FILE" tun auto-detect-interface true
 set_yaml_section_scalar "$CONFIG_FILE" tun strict-route true
+ensure_yaml_section_scalar "$CONFIG_FILE" tun dns-hijack '[any:53, tcp://any:53]'
 
 http_port="$(sed -n -E 's/^port:[[:space:]]*([0-9]+).*/\1/p' "$CONFIG_FILE" | head -1)"
 mixed_port="$(sed -n -E 's/^mixed-port:[[:space:]]*([0-9]+).*/\1/p' "$CONFIG_FILE" | head -1)"

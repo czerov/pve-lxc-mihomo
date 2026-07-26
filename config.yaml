@@ -93,6 +93,7 @@ tun:
   auto-route: true
   auto-detect-interface: true
   strict-route: true
+  dns-hijack: [any:53, tcp://any:53]
 # 嗅探
 sniffer:
   enable: true
