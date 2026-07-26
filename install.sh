@@ -5,7 +5,7 @@ set -Eeuo pipefail
 # Safe defaults:
 # - No batch deletion.
 # - Existing files are copied to timestamped backups before overwrite.
-# - CPU is detected automatically: amd64-v3 core when supported, compatible core otherwise.
+# - CPU is detected automatically: amd64-v3/compatible on x86, arm64 on ARM64.
 
 VERSION="${VERSION:-latest}"
 MIHOMO_FALLBACK_VERSION="${MIHOMO_FALLBACK_VERSION:-v1.19.28}"

@@ -37,9 +37,17 @@ CT_SWAP="${CT_SWAP:-0}"
 CT_DISK_SIZE="${CT_DISK_SIZE:-8}"
 CT_ROOTFS_STORAGE="${CT_ROOTFS_STORAGE:-}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
-CT_TEMPLATE_NAME="${CT_TEMPLATE_NAME:-debian-13-standard_13.1-2_amd64.tar.zst}"
+if [ "${CT_TEMPLATE_NAME+x}" = "x" ]; then
+  CT_TEMPLATE_NAME_WAS_SET=1
+else
+  CT_TEMPLATE_NAME_WAS_SET=0
+fi
+CT_TEMPLATE_NAME="${CT_TEMPLATE_NAME:-}"
 TEMPLATE_MIRROR="${TEMPLATE_MIRROR:-auto}"
 TEMPLATE_URL="${TEMPLATE_URL:-}"
+LXC_IMAGE_MIRROR="${LXC_IMAGE_MIRROR:-auto}"
+LXC_IMAGE_RELEASE="${LXC_IMAGE_RELEASE:-trixie}"
+LXC_IMAGE_VARIANT="${LXC_IMAGE_VARIANT:-default}"
 CT_PASSWORD="${CT_PASSWORD:-}"
 CT_DNS="${CT_DNS:-223.5.5.5}"
 if [ "${LXC_INSTALL_MODE+x}" = "x" ]; then
@@ -72,6 +80,9 @@ NEXUSBOX_PATCHED_SHA256="${NEXUSBOX_PATCHED_SHA256:-}"
 DEFAULT_CONFIG_URL="${DEFAULT_CONFIG_URL:-${RAW_BASE}/config.yaml}"
 CONFIG_URL="${CONFIG_URL:-$DEFAULT_CONFIG_URL}"
 ZASHBOARD_URL="${ZASHBOARD_URL:-https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip}"
+PVE_ARCH=""
+PVE_ARCH_RAW=""
+LAST_DOWNLOAD_URL=""
 
 WORK_DIR="${WORK_DIR:-/tmp/pve-mihomo-router}"
 LOG="${LOG:-/root/pve-mihomo-router-install.log}"
@@ -125,6 +136,7 @@ download_best_url() {
   local output="$1" url speed best_url="" best_speed="0"
   shift
   local usable_urls=()
+  LAST_DOWNLOAD_URL=""
 
   if prefer_cn_accel_enabled; then
     say "已启用国内加速，按顺序尝试下载源"
@@ -132,6 +144,7 @@ download_best_url() {
       [ -n "$url" ] || continue
       say "尝试优先下载源：$url"
       if fetch_url "$url" "$output" && [ -s "$output" ]; then
+        LAST_DOWNLOAD_URL="$url"
         return 0
       fi
     done
@@ -159,6 +172,7 @@ download_best_url() {
   if [ -n "$best_url" ]; then
     say "已选择下载源：$best_url（${best_speed} B/s）"
     if fetch_url "$best_url" "$output" && [ -s "$output" ]; then
+      LAST_DOWNLOAD_URL="$best_url"
       return 0
     fi
     say "已选下载源失败，继续尝试其他可用源。"
@@ -168,6 +182,7 @@ download_best_url() {
     [ "$url" != "$best_url" ] || continue
     say "尝试备用下载源：$url"
     if fetch_url "$url" "$output" && [ -s "$output" ]; then
+      LAST_DOWNLOAD_URL="$url"
       return 0
     fi
   done
@@ -177,6 +192,7 @@ download_best_url() {
     [ -n "$url" ] || continue
     say "尝试下载：$url"
     if fetch_url "$url" "$output" && [ -s "$output" ]; then
+      LAST_DOWNLOAD_URL="$url"
       return 0
     fi
   done
@@ -193,6 +209,46 @@ require_pve_host() {
   fi
   have pveam || die "找不到 pveam，请在 Proxmox VE 宿主机运行。"
   have curl || die "找不到 curl，请先在 PVE 宿主机安装 curl。"
+}
+
+normalize_pve_arch() {
+  case "$1" in
+    x86_64|amd64) printf 'amd64' ;;
+    aarch64|arm64) printf 'arm64' ;;
+    *) return 1 ;;
+  esac
+}
+
+detect_pve_arch() {
+  PVE_ARCH_RAW="$(uname -m)"
+  PVE_ARCH="$(normalize_pve_arch "$PVE_ARCH_RAW")" || \
+    die "暂不支持当前 PVE 架构：$PVE_ARCH_RAW；目前支持 amd64 和 arm64/aarch64。"
+
+  if [ "$CT_TEMPLATE_NAME_WAS_SET" = "0" ]; then
+    case "$PVE_ARCH" in
+      amd64) CT_TEMPLATE_NAME="debian-13-standard_13.1-2_amd64.tar.zst" ;;
+      arm64) CT_TEMPLATE_NAME="debian-13-standard_linuxcontainers_arm64.tar.xz" ;;
+    esac
+  fi
+
+  say "PVE 架构检测：${PVE_ARCH_RAW} -> ${PVE_ARCH}"
+  say "LXC 将使用 ${PVE_ARCH} 架构"
+}
+
+template_arch_from_name() {
+  case "$1" in
+    *amd64*|*x86_64*) printf 'amd64' ;;
+    *arm64*|*aarch64*) printf 'arm64' ;;
+    *) return 1 ;;
+  esac
+}
+
+validate_template_arch() {
+  local name="$1" declared_arch
+  declared_arch="$(template_arch_from_name "$name" || true)"
+  if [ -n "$declared_arch" ] && [ "$declared_arch" != "$PVE_ARCH" ]; then
+    die "模板架构不匹配：PVE=${PVE_ARCH}，模板=${name}（${declared_arch}）。"
+  fi
 }
 
 is_interactive() {
@@ -628,6 +684,108 @@ download_template_from_mirrors() {
   return 1
 }
 
+find_existing_debian_template() {
+  local release="$1"
+  pveam list "$CT_TEMPLATE_STORAGE" 2>/dev/null |
+    awk -v release="debian-${release}-standard" -v arch="$PVE_ARCH" '
+      $0 ~ release && $0 ~ arch && $0 ~ /(tar\.zst|tar\.xz|tar\.gz)/ {print $1}
+    ' |
+    sort -V |
+    tail -1 || true
+}
+
+find_available_debian_template() {
+  local release="$1"
+  pveam available --section system 2>/dev/null |
+    awk -v release="debian-${release}-standard" -v arch="$PVE_ARCH" '
+      $0 ~ release && $0 ~ arch && $0 ~ /(tar\.zst|tar\.xz|tar\.gz)/ {print $2}
+    ' |
+    sort -V |
+    tail -1 || true
+}
+
+latest_lxc_image_path_from_index() {
+  grep -oE 'href="[0-9]{8}_[0-9]{2}(%3A|:)[0-9]{2}/"' |
+    sed -n 's/^href="\([^"]*\)"$/\1/p' |
+    LC_ALL=C sort -V |
+    tail -1
+}
+
+resolve_lxc_image_rootfs_url() {
+  local mirror_root="$1" index_url index latest_path
+  index_url="${mirror_root%/}/images/debian/${LXC_IMAGE_RELEASE}/${PVE_ARCH}/${LXC_IMAGE_VARIANT}/"
+  index="$(curl -fsSL --connect-timeout 10 --max-time 30 "$index_url" 2>/dev/null || true)"
+  [ -n "$index" ] || return 1
+  latest_path="$(printf '%s' "$index" | latest_lxc_image_path_from_index || true)"
+  [ -n "$latest_path" ] || return 1
+  printf '%s%srootfs.tar.xz' "$index_url" "$latest_path"
+}
+
+verify_lxc_image_template() {
+  local archive="$1" source_url="$2" sums_file checksum_url expected actual
+  sums_file="${WORK_DIR}/lxc-image-SHA256SUMS"
+  checksum_url="${source_url%/*}/SHA256SUMS"
+
+  have sha256sum || die "缺少 sha256sum，无法校验 ARM64 LXC 模板。"
+  say "正在下载 ARM64 模板校验文件：$checksum_url"
+  fetch_url "$checksum_url" "$sums_file" || return 1
+  expected="$(awk '$2 == "rootfs.tar.xz" || $2 == "*rootfs.tar.xz" {print $1; exit}' "$sums_file")"
+  [ -n "$expected" ] || return 1
+  actual="$(sha256sum "$archive" | awk '{print $1}')"
+  [ "$actual" = "$expected" ] || {
+    say "ARM64 LXC 模板 SHA-256 校验失败。"
+    return 1
+  }
+  tar -tf "$archive" >/dev/null 2>&1 || {
+    say "ARM64 LXC 模板压缩包无法读取。"
+    return 1
+  }
+  say "ARM64 LXC 模板 SHA-256 与压缩包检查通过"
+}
+
+download_arm64_lxc_image_template() {
+  local output="$1" mirror candidate
+  local mirrors=() urls=()
+
+  [ "$PVE_ARCH" = "arm64" ] || return 1
+  case "$TEMPLATE_MIRROR" in
+    off|pveam) return 1 ;;
+  esac
+
+  if [ "$LXC_IMAGE_MIRROR" != "auto" ] && [ -n "$LXC_IMAGE_MIRROR" ]; then
+    mirrors+=("$LXC_IMAGE_MIRROR")
+  fi
+  if prefer_cn_accel_enabled; then
+    mirrors+=(
+      "https://mirrors.tuna.tsinghua.edu.cn/lxc-images"
+      "https://images.linuxcontainers.org"
+    )
+  else
+    mirrors+=(
+      "https://images.linuxcontainers.org"
+      "https://mirrors.tuna.tsinghua.edu.cn/lxc-images"
+    )
+  fi
+
+  say "PVE 模板目录未提供 ARM64 Debian，正在解析 Linux Containers 镜像"
+  for mirror in "${mirrors[@]}"; do
+    say "检测 ARM64 模板目录：${mirror%/}/images/debian/${LXC_IMAGE_RELEASE}/${PVE_ARCH}/${LXC_IMAGE_VARIANT}/"
+    candidate="$(resolve_lxc_image_rootfs_url "$mirror" || true)"
+    if [ -n "$candidate" ]; then
+      say "发现 ARM64 模板：$candidate"
+      urls+=("$candidate")
+    else
+      say "ARM64 模板目录不可用：$mirror"
+    fi
+  done
+  [ "${#urls[@]}" -gt 0 ] || return 1
+
+  mkdir -p "$(dirname "$output")"
+  download_best_url "$output" "${urls[@]}" || return 1
+  [ -n "$LAST_DOWNLOAD_URL" ] || return 1
+  verify_lxc_image_template "$output" "$LAST_DOWNLOAD_URL"
+}
+
 choose_template() {
   local existing latest
   if [ -n "$TEMPLATE_URL" ]; then
@@ -635,6 +793,7 @@ choose_template() {
     filename="${TEMPLATE_URL%%\?*}"
     filename="${filename##*/}"
     [ -n "$filename" ] || die "无法从 TEMPLATE_URL 解析模板文件名。"
+    validate_template_arch "$filename"
     template_path="$(template_path_for_name "$filename")"
     mkdir -p "$(dirname "$template_path")"
     if [ ! -s "$template_path" ]; then
@@ -649,6 +808,7 @@ choose_template() {
   fi
 
   if [ -n "$CT_TEMPLATE_NAME" ]; then
+    validate_template_arch "$CT_TEMPLATE_NAME"
     existing="$(pveam list "$CT_TEMPLATE_STORAGE" 2>/dev/null | awk -v name="$CT_TEMPLATE_NAME" '$1 == name || $1 == "vztmpl/" name || $1 ~ ("/" name "$") {print $1; exit}' || true)"
     if [ -z "$existing" ]; then
       local template_path
@@ -663,32 +823,58 @@ choose_template() {
       return 0
     fi
     say "本地未找到首选模板：$CT_TEMPLATE_NAME"
-    local preferred_path
-    preferred_path="$(template_path_for_name "$CT_TEMPLATE_NAME")"
-    if download_template_from_mirrors "$CT_TEMPLATE_NAME" "$preferred_path"; then
-      TEMPLATE="${CT_TEMPLATE_STORAGE}:vztmpl/${CT_TEMPLATE_NAME}"
-      say "使用已下载的首选模板：$TEMPLATE"
-      return 0
+    if [ "$PVE_ARCH" = "amd64" ] || [ "$CT_TEMPLATE_NAME_WAS_SET" = "1" ]; then
+      local preferred_path
+      preferred_path="$(template_path_for_name "$CT_TEMPLATE_NAME")"
+      if download_template_from_mirrors "$CT_TEMPLATE_NAME" "$preferred_path"; then
+        TEMPLATE="${CT_TEMPLATE_STORAGE}:vztmpl/${CT_TEMPLATE_NAME}"
+        say "使用已下载的首选模板：$TEMPLATE"
+        return 0
+      fi
     fi
   fi
 
-  existing="$(pveam list "$CT_TEMPLATE_STORAGE" 2>/dev/null | awk '/debian-13-standard.*amd64.*(tar.zst|tar.gz)/{print $1}' | sort -V | tail -1 || true)"
+  existing="$(find_existing_debian_template 13)"
+  if [ -z "$existing" ]; then
+    existing="$(find_existing_debian_template 12)"
+  fi
   if [ -n "$existing" ]; then
+    validate_template_arch "$existing"
     TEMPLATE="$existing"
     say "使用已有模板：$TEMPLATE"
     return 0
   fi
 
   say "正在更新 LXC 模板列表"
-  pveam update
-  latest="$(pveam available --section system | awk '/debian-13-standard.*amd64.*(tar.zst|tar.gz)/{print $2}' | sort -V | tail -1 || true)"
-  if [ -z "$latest" ]; then
-    latest="$(pveam available --section system | awk '/debian-12-standard.*amd64.*(tar.zst|tar.gz)/{print $2}' | sort -V | tail -1 || true)"
+  if ! pveam update; then
+    say "PVE 模板列表更新失败，继续检查缓存和备用镜像。"
   fi
-  [ -n "$latest" ] || die "找不到 Debian 13/12 amd64 LXC 模板。"
-  say "正在下载模板：$latest"
-  pveam download "$CT_TEMPLATE_STORAGE" "$latest"
-  TEMPLATE="${CT_TEMPLATE_STORAGE}:vztmpl/${latest}"
+  latest="$(find_available_debian_template 13)"
+  if [ -z "$latest" ]; then
+    latest="$(find_available_debian_template 12)"
+  fi
+  if [ -n "$latest" ]; then
+    validate_template_arch "$latest"
+    say "正在下载模板：$latest"
+    pveam download "$CT_TEMPLATE_STORAGE" "$latest"
+    TEMPLATE="${CT_TEMPLATE_STORAGE}:vztmpl/${latest}"
+    return 0
+  fi
+
+  if [ "$PVE_ARCH" = "arm64" ]; then
+    local arm_template_name arm_template_path
+    arm_template_name="${CT_TEMPLATE_NAME:-debian-13-standard_linuxcontainers_arm64.tar.xz}"
+    validate_template_arch "$arm_template_name"
+    arm_template_path="$(template_path_for_name "$arm_template_name")"
+    if download_arm64_lxc_image_template "$arm_template_path"; then
+      TEMPLATE="${CT_TEMPLATE_STORAGE}:vztmpl/${arm_template_name}"
+      say "使用 Linux Containers ARM64 Debian 模板：$TEMPLATE"
+      return 0
+    fi
+    die "找不到可用的 Debian 13/12 arm64 模板。可设置 TEMPLATE_URL=<ARM64 模板地址> 后重试。"
+  fi
+
+  die "找不到 Debian 13/12 ${PVE_ARCH} LXC 模板。"
 }
 
 create_container() {
@@ -697,6 +883,7 @@ create_container() {
   [ -n "$CT_PASSWORD" ] && password_args=(--password "$CT_PASSWORD")
 
   pct create "$CTID" "$TEMPLATE" \
+    --arch "$PVE_ARCH" \
     --hostname "$CT_HOSTNAME" \
     --rootfs "${CT_ROOTFS_STORAGE}:${CT_DISK_SIZE}" \
     --cores "$CT_CORES" \
@@ -1085,6 +1272,7 @@ print_summary() {
   say "第 1-4 阶段已完成"
   echo "LXC ID：$CTID"
   echo "LXC IP：$ip"
+  echo "PVE/LXC 架构：$PVE_ARCH"
   echo "安装类型：$INSTALL_PROFILE"
   echo "路由模式：$ROUTING_MODE"
   if [ "$INSTALL_PROFILE" = "nexusbox" ]; then
@@ -1129,6 +1317,7 @@ print_summary() {
 
 main() {
   require_pve_host
+  detect_pve_arch
   prompt_choices
   validate_routing_mode
   detect_storage

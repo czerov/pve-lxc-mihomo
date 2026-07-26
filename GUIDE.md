@@ -1,6 +1,6 @@
 # PVE LXC Mihomo 旁路由一键安装教程
 
-适用场景：PVE LXC 容器部署 Mihomo / NexusBox 旁路由，解决核心不兼容 `amd64-v3`、国内网络下载困难、NexusBox 热重载、provider 节点测速和 NAT 防火墙自启等问题。
+适用场景：amd64 或 ARM64 PVE LXC 容器部署 Mihomo / NexusBox 旁路由，解决核心不兼容 `amd64-v3`、架构模板不匹配、国内网络下载困难、NexusBox 热重载、provider 节点测速和 NAT 防火墙自启等问题。
 
 ## 典型问题
 
@@ -27,9 +27,11 @@ This program can only be run on AMD64 processors with v3 microarchitecture suppo
 它会自动做这些检测和处理：
 
 - 自动检测 CPU 架构。
+- PVE 宿主机自动匹配 amd64 / ARM64 Debian LXC 模板，并在创建 CT 时指定正确架构。
 - x86_64 下自动判断是否支持 `amd64-v3`。
 - 支持 `amd64-v3` 时安装 `mihomo-linux-amd64-v3`。
 - 不支持 `amd64-v3` 时安装 `mihomo-linux-amd64-compatible`。
+- ARM64 下自动安装 `mihomo-linux-arm64` 和 ARM64 NexusBox 修补版。
 - 检测是否存在 `/opt/nexusbox/nexusbox`。
 - 如果存在 NexusBox：自动替换 `/opt/mihomo/mihomo` 核心并重启 NexusBox。
 - 自动安装修补版 NexusBox，兼容当前 Mihomo 热重载 API。

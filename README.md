@@ -1,11 +1,12 @@
 # PVE LXC Mihomo / NexusBox
 
-在 Proxmox VE 上自动创建或复用 Debian LXC，并安装 Mihomo、NexusBox 和 Zashboard。默认使用中文交互、KDocs 旁路由模式和公开规则配置。
+在 amd64 或 ARM64 Proxmox VE 上自动创建或复用 Debian LXC，并安装 Mihomo、NexusBox 和 Zashboard。默认使用中文交互、KDocs 旁路由模式和公开规则配置。
 
 ## 主要功能
 
 - 自动检测 PVE 网桥、网关、存储、空闲 CTID 和 LXC IP。
-- 自动选择 Debian 模板下载源，并适配 `amd64-v3`、兼容版 AMD64 和 ARM64 核心。
+- 自动识别 PVE 的 amd64 / ARM64 架构，只创建同架构 Debian LXC。
+- x86 自动选择 `amd64-v3` 或兼容版核心；ARM64 自动选择 ARM64 Mihomo 与 NexusBox。
 - 安装 Mihomo、NexusBox 修补版、Zashboard、TUN、DNS、NAT 和开机自启。
 - 默认导入 AI、Google、YouTube、Telegram、Netflix、TikTok、PT 和游戏等分流规则。
 - 修改配置前自动备份，安装和更新后校验配置；失败时尽量自动恢复。
@@ -36,6 +37,16 @@ DNS:      LXC_IP:53
 ```
 
 > `pve-install-cn.sh` 必须在 PVE 宿主机运行。出现 `pct: command not found` 说明当前终端位于 LXC 容器内。
+
+### AMD64 / ARM64
+
+两种架构使用同一条安装命令。脚本会显示类似 `PVE 架构检测：aarch64 -> arm64`，并在创建 CT 时显式指定正确架构。
+
+- amd64：优先使用本地或 Proxmox 镜像中的 Debian 13/12 amd64 模板。
+- ARM64：优先使用本地或 `pveam` 中的同架构模板；没有时从清华 LXC 镜像和 [Linux Containers 官方镜像](https://images.linuxcontainers.org/)解析最新 Debian 13 ARM64 根文件系统。
+- ARM64 备用模板必须通过 SHA-256 与压缩包完整性检查，用户指定的模板文件名若明确属于其他架构会被拒绝。
+
+ARM 版 PVE 通常来自社区移植。脚本要求宿主机已经具备可正常工作的 `pct`、`pveam` 和 LXC；本项目不会安装或修复 PVE 本身。
 
 ## 已有 LXC
 
@@ -78,6 +89,10 @@ ROUTING_MODE=gateway bash <(curl -fsSL https://gh-proxy.com/https://raw.githubus
 | --- | --- |
 | `CTID=109` | 指定容器 ID |
 | `USE_EXISTING=1` | 使用已有 LXC |
+| `CT_TEMPLATE_NAME=...` | 指定同架构本地模板名 |
+| `TEMPLATE_URL=...` | 指定同架构模板下载地址 |
+| `TEMPLATE_MIRROR=pveam` | 只使用 PVE 模板目录；ARM64 不再使用备用镜像 |
+| `LXC_IMAGE_MIRROR=...` | 指定 Linux Containers 镜像站根地址 |
 | `ROUTING_MODE=kdocs` | 使用 KDocs 模式 |
 | `ROUTING_MODE=gateway` | 使用完整网关模式 |
 | `LXC_PROXY=auto` | 自动探测安装时可用的代理 |

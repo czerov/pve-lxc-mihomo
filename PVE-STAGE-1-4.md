@@ -105,14 +105,14 @@ CONFIG_URL=默认使用仓库公开 config.yaml；可设置为自定义 URL；�
 
 - 检查当前是否是 PVE 宿主机。
 - 检查 `pct`、`pveam`、`curl`。
+- 自动识别 PVE 为 `amd64` 或 `arm64/aarch64`，创建 CT 时显式使用同架构。
 - 检查 `CTID` 是否已存在；默认自动选择下一个空闲 CTID，避免覆盖。
 - 自动检测 PVE 内网桥接、网关、CIDR。
 - 自动选择同网段可用 LXC IP，并避开已有 PVE LXC/QEMU 配置里占用的静态 IP。
-- 自动优先查找本地 `debian-13-standard_13.1-2_amd64.tar.zst` 模板。
-- 如果指定模板不存在，则查找 Debian 13 amd64 模板，再回退 Debian 12 amd64 模板。
-- 本地没有指定模板时，默认 `TEMPLATE_MIRROR=auto` 自动测速清华 TUNA、中科大 USTC、南京大学 NJU、Proxmox 官方源，并选择最快可用源。
-- 镜像下载失败会自动换下一个；全部失败再回退到 `pveam download`。
-- 本地没有模板时自动用 `pveam download` 下载。
+- amd64 自动优先查找本地 `debian-13-standard_13.1-2_amd64.tar.zst`，再查找 Debian 13/12 amd64 模板。
+- amd64 默认 `TEMPLATE_MIRROR=auto`，自动测速清华 TUNA、中科大 USTC、南京大学 NJU、Proxmox 官方源并选择可用源。
+- ARM64 优先查找本地及 `pveam` 中的 Debian 13/12 arm64 模板；没有时自动解析清华 LXC 镜像和 Linux Containers 官方源的最新 Debian 13 ARM64 根文件系统。
+- ARM64 备用模板必须通过 SHA-256 和压缩包完整性检查；文件名明确属于其他架构时直接拒绝。
 - 用 `pct create` 创建 Debian LXC。
 
 如果使用 `USE_EXISTING=1`，脚本会跳过创建步骤，改为检测已有 LXC 网络信息。
@@ -132,9 +132,10 @@ CT_CORES=1
 CT_MEMORY=512
 CT_SWAP=0
 CT_DISK_SIZE=8
-CT_TEMPLATE_NAME=debian-13-standard_13.1-2_amd64.tar.zst
+CT_TEMPLATE_NAME=根据 PVE 架构自动选择
 TEMPLATE_MIRROR=auto
-TEMPLATE_URL=空，优先自动测速镜像并下载指定模板；镜像不可用时使用 pveam 下载 Debian 13 模板；如果 PVE 源没有 Debian 13，再回退到 Debian 12
+LXC_IMAGE_MIRROR=auto，ARM64 回退时使用清华镜像和 Linux Containers 官方源
+TEMPLATE_URL=空；设置后必须提供与 PVE 相同架构的模板
 ```
 
 `AUTO_CTID=auto` 表示默认 `CTID=109` 冲突时自动向后找空闲 ID；如果手动传入 `CTID=xxx`，默认按手动 ID 严格执行。需要从手动 ID 往后自动找空闲 ID 时，设置 `AUTO_CTID=1`。
@@ -178,6 +179,7 @@ lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
 - 自动检测是否支持 `amd64-v3`，并在日志里打印架构、支持结果和缺失的 CPU flags。
 - 支持则安装 `mihomo-linux-amd64-v3`。
 - 不支持则安装 `mihomo-linux-amd64-compatible`。
+- ARM64 容器自动安装 `mihomo-linux-arm64` 和 ARM64 NexusBox 修补版。
 - 如果检测到 `/opt/nexusbox/nexusbox`，则修复 NexusBox 的 `/opt/mihomo/mihomo`，并替换为兼容当前 mihomo 热重载和 provider 节点测速 API 的修补版 NexusBox 二进制。
 - 新建 LXC 默认使用 Ladavian/NexusBox 官方脚本从零安装 NexusBox，并自动尝试 CDN / GitHub 加速源。
 - 安装后替换为兼容当前 Mihomo 的修补版 NexusBox。
