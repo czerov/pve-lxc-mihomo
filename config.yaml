@@ -241,7 +241,7 @@ rules:
   - IP-CIDR,192.168.1.0/24,DIRECT,no-resolve
   # 常用必备
   - DST-PORT,123,DIRECT
-  - RULE-SET,Private-IP,DIRECT
+  - RULE-SET,Private-IP,DIRECT,no-resolve
   - RULE-SET,Private-Domain,DIRECT
 
   # 115网盘、登录、下载及关联CDN强制直连

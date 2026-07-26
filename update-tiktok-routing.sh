@@ -127,6 +127,11 @@ BEGIN {
     next
   }
 
+  if ($0 == "  - RULE-SET,Private-IP,DIRECT") {
+    print "  - RULE-SET,Private-IP,DIRECT,no-resolve"
+    next
+  }
+
   if ($0 ~ /^  - RULE-SET,TikTok,TikTok[[:space:]]*$/) {
     if (!route_written) {
       print "  - RULE-SET,TikTok-iOS,TikTok"
@@ -155,6 +160,7 @@ mv "$TMP" "$CONFIG_FILE"
 grep -q '^    "rule-set:TikTok-iOS":' "$CONFIG_FILE" || die "TikTok iOS DNS 策略写入失败。"
 grep -q '^  TikTok-iOS:' "$CONFIG_FILE" || die "TikTok iOS 规则提供器写入失败。"
 grep -Fqx '  - RULE-SET,TikTok-iOS,TikTok' "$CONFIG_FILE" || die "TikTok iOS 路由规则写入失败。"
+grep -Fqx '  - RULE-SET,Private-IP,DIRECT,no-resolve' "$CONFIG_FILE" || die "私网 IP 防止域名误判规则写入失败。"
 if grep -Fqx '  - AND,((NETWORK,UDP),(DST-PORT,443),(RULE-SET,TikTok-iOS)),REJECT' "$CONFIG_FILE"; then
   die "旧版 TikTok UDP 拒绝规则移除失败。"
 fi
@@ -172,5 +178,5 @@ curl -fsS --unix-socket "$CORE_SOCKET" -X POST 'http://localhost/cache/dns/flush
 curl -fsS --unix-socket "$CORE_SOCKET" -X DELETE 'http://localhost/connections' >/dev/null
 
 trap - ERR
-say "TikTok iOS 域名、代理 DNS 和 UDP 直通规则已生效。"
+say "TikTok iOS 域名、代理 DNS、UDP 直通及私网 IP 防误判规则已生效。"
 say "请在 TikTok 分组选择新加坡、日本或美国节点，然后在 iPhone 上完全关闭 TikTok 后重新打开。"
