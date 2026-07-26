@@ -88,6 +88,7 @@ LXC_PROXY_PORT=7897
 LXC_PROXY_COMMON_PORTS="7897 7890 7891 7892 7893 7895 7896 7899 1080 10808 10809 20170 20171"
 PREFER_CN_ACCEL=1  国内入口默认开启，下载脚本、Mihomo、NexusBox 时优先走 GitHub 加速源
 CONFIG_URL=默认使用仓库公开 config.yaml；可设置为自定义 URL；设置 off 可关闭导入
+KDOCS_TUN_STACK=system  默认高性能 TUN；启动失败自动完整重启并回退 gvisor
 ```
 
 已有容器模式会：
@@ -161,6 +162,7 @@ lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
 - 写入 /etc/sysctl.d/99-forward.conf。
 - 开启 IPv4/IPv6 转发和 IPv6 RA。
 - 停止占用 53 端口的 systemd-resolved。
+- KDocs 默认使用 `System` TUN；若无法创建 `Meta` 网卡，自动完整重启并回退 `gVisor`。
 - 下载 Zashboard 官方完整字体包到 /opt/config/ui/zash。
 
 ## 第 3 阶段：容器内安装 / 修复核心

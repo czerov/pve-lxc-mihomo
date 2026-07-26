@@ -43,9 +43,8 @@ udp: true
 port: 7890
 # SOCKS5 代理端口
 socks-port: 7891
-# 混合端口 HTTP + SOCKS5
-# 启用后，这个端口同时支持 HTTP 和 SOCKS5 协议
-mixed-port: 7890
+# 已分别启用 HTTP 7890 与 SOCKS5 7891，关闭重复的混合端口。
+mixed-port: 0
 # Redirect 模式端口 用于 Linux 下 iptables 的 TUN/透明代理 不要修改脚本需要通过这个端口进行转发
 redir-port: 7877
 # TPROXY 模式端口 Transparent Proxy 不要修改脚本需要通过这个端口进行转发
@@ -88,7 +87,8 @@ profile:
 tun:
   # KDocs 模式依靠 TUN 接管主路由送来的 198.18.0.0/16 Fake-IP 流量。
   enable: true
-  stack: gvisor
+  # System 栈实测吞吐更高；安装脚本会在启动失败时自动回退 gVisor。
+  stack: system
   device: Meta
   auto-route: true
   auto-detect-interface: true

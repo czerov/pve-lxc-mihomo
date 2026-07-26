@@ -39,7 +39,7 @@ This program can only be run on AMD64 processors with v3 microarchitecture suppo
 - 新建 LXC 默认从官方脚本安装 NexusBox，并安装 Zashboard。
 - 可显式选择纯 Mihomo systemd 服务。
 - 自动测试 Mihomo 配置。
-- 默认启用 KDocs TUN、DNS 53 和 Fake-IP 198.18.0.0/16。
+- 默认启用 KDocs `System` TUN、DNS 53 和 Fake-IP 198.18.0.0/16；TUN 启动失败自动完整重启并回退 `gVisor`。
 - 自动配置 rc.local MASQUERADE 自启。
 - 自动配置 IPv4/IPv6 转发和 IPv6 RA。
 - 自动安装缺失的 `iptables` 等依赖。
@@ -123,7 +123,7 @@ DNS：LXC 容器 IP，例如 192.168.1.9
 下一跳/网关：LXC 容器 IP，例如 192.168.1.9
 ```
 
-并关闭“允许 ICMP 重定向”。KDocs 模式会自动启用 Mihomo TUN，NexusBox 中不需要再打开 TProxy。
+并关闭“允许 ICMP 重定向”。KDocs 模式会自动启用 Mihomo TUN，NexusBox 中不需要再打开 TProxy。手动切换 TUN 栈后应停止再启动核心，不要直接热重载 TUN 配置。
 
 该模式默认只覆盖 Fake-IP。爱快用户可将以下 Telegram IPv4 网段的下一跳设置为 LXC IP，使固定 DC IP 进入 Mihomo：
 

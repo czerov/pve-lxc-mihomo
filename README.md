@@ -73,7 +73,9 @@ bash <(curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/
 下一跳：LXC IP
 ```
 
-该模式通过 Fake-IP 和 TUN 接管流量，NexusBox 中无需再开启 TProxy。Telegram 等固定 IP 网段的配置见 [GUIDE.md](GUIDE.md)。
+该模式通过 Fake-IP 和 TUN 接管流量，默认优先使用吞吐更高的 `System` 栈；若容器内无法创建 TUN，安装脚本会完整重启并自动回退 `gVisor`。NexusBox 中无需再开启 TProxy。Telegram 等固定 IP 网段的配置见 [GUIDE.md](GUIDE.md)。
+
+切换 TUN 协议栈后应停止再启动核心，不能只做配置热重载；否则旧 TUN 设备未释放时可能出现 `device or resource busy`。
 
 ### 完整网关模式
 
@@ -95,6 +97,8 @@ ROUTING_MODE=gateway bash <(curl -fsSL https://gh-proxy.com/https://raw.githubus
 | `LXC_IMAGE_MIRROR=...` | 指定 Linux Containers 镜像站根地址 |
 | `ROUTING_MODE=kdocs` | 使用 KDocs 模式 |
 | `ROUTING_MODE=gateway` | 使用完整网关模式 |
+| `KDOCS_TUN_STACK=system` | KDocs 默认高性能 TUN；失败自动回退 `gvisor` |
+| `KDOCS_TUN_STACK=gvisor` | 强制使用兼容 TUN 栈 |
 | `LXC_PROXY=auto` | 自动探测安装时可用的代理 |
 | `CONFIG_URL=...` | 导入自定义 Mihomo 配置 |
 | `CONFIG_URL=off` | 不导入仓库默认配置 |

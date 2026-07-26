@@ -32,6 +32,7 @@ TIKTOK_IOS_RULE_URL="${TIKTOK_IOS_RULE_URL:-https://raw.githubusercontent.com/${
 MODE="${MODE:-auto}"
 INSTALL_PROFILE="${INSTALL_PROFILE:-unknown}"
 ROUTING_MODE="${ROUTING_MODE:-kdocs}"
+KDOCS_TUN_STACK="${KDOCS_TUN_STACK:-system}"
 PREFER_CN_ACCEL="${PREFER_CN_ACCEL:-0}"
 DOWNLOAD_SPEED_LIMIT="${DOWNLOAD_SPEED_LIMIT:-1024}"
 DOWNLOAD_SPEED_TIME="${DOWNLOAD_SPEED_TIME:-30}"
@@ -54,6 +55,10 @@ validate_routing_mode() {
   case "$ROUTING_MODE" in
     kdocs|gateway) ;;
     *) die "未知 ROUTING_MODE=$ROUTING_MODE，请使用 kdocs 或 gateway。" ;;
+  esac
+  case "$KDOCS_TUN_STACK" in
+    system|gvisor|mixed) ;;
+    *) die "未知 KDOCS_TUN_STACK=$KDOCS_TUN_STACK，请使用 system、gvisor 或 mixed。" ;;
   esac
 }
 prefer_cn_accel_enabled() {
@@ -420,7 +425,7 @@ apply_routing_profile_to_config() {
   local file="$1" profile="${2:-}"
   if routing_mode_is_kdocs; then
     set_yaml_section_scalar "$file" "tun" "enable" "true"
-    set_yaml_section_scalar "$file" "tun" "stack" "gvisor"
+    set_yaml_section_scalar "$file" "tun" "stack" "$KDOCS_TUN_STACK"
     set_yaml_section_scalar "$file" "tun" "device" "Meta"
     set_yaml_section_scalar "$file" "tun" "auto-route" "true"
     set_yaml_section_scalar "$file" "tun" "auto-detect-interface" "true"
@@ -430,7 +435,7 @@ apply_routing_profile_to_config() {
     set_yaml_section_scalar "$file" "dns" "enhanced-mode" "fake-ip"
     set_yaml_section_scalar "$file" "dns" "fake-ip-range" "198.18.0.1/16"
     [ "$profile" != "nexusbox" ] || set_yaml_scalar "$file" "external-ui" "ui/zash"
-    say "已应用 KDocs 路由配置：DNS 53，Fake-IP 198.18.0.0/16。"
+    say "已应用 KDocs 路由配置：System TUN 优先，DNS 53，Fake-IP 198.18.0.0/16（当前 stack=${KDOCS_TUN_STACK}）。"
   else
     set_yaml_section_scalar "$file" "tun" "enable" "false"
     set_yaml_section_scalar "$file" "dns" "listen" "0.0.0.0:6666"
@@ -493,6 +498,23 @@ detect_dns_listen_port() {
       if (n > 0 && parts[n] ~ /^[0-9]+$/) {
         print parts[n]
       }
+      exit
+    }
+  ' "$file"
+}
+
+detect_tun_stack() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+  awk '
+    /^tun:[[:space:]]*$/ { in_tun=1; next }
+    in_tun && /^[^[:space:]#]/ { in_tun=0 }
+    in_tun && /^[[:space:]]*stack:[[:space:]]*/ {
+      value=$0
+      sub(/^[[:space:]]*stack:[[:space:]]*/, "", value)
+      sub(/[[:space:]]*#.*/, "", value)
+      gsub(/["'\'' ]/, "", value)
+      print tolower(value)
       exit
     }
   ' "$file"
@@ -1167,10 +1189,68 @@ verify_forwarding_runtime() {
 }
 
 verify_tun_runtime() {
+  local config_file="${1:-$CONFIG_FILE}" stack
   routing_mode_is_kdocs || return 0
   [ -c /dev/net/tun ] || die "缺少 /dev/net/tun。"
   ip link show Meta >/dev/null 2>&1 || die "KDocs 模式未创建 Meta TUN 网卡。"
-  say "KDocs TUN 网卡验证正常：Meta"
+  stack="$(detect_tun_stack "$config_file" || true)"
+  say "KDocs TUN 网卡验证正常：Meta（stack=${stack:-unknown}）"
+}
+
+tun_runtime_ready() {
+  [ -c /dev/net/tun ] && ip link show Meta >/dev/null 2>&1
+}
+
+wait_for_tun_runtime() {
+  local _
+  for _ in $(seq 1 15); do
+    tun_runtime_ready && return 0
+    sleep 1
+  done
+  return 1
+}
+
+restart_for_tun_stack() {
+  local profile="$1"
+  case "$profile" in
+    standalone)
+      systemctl restart mihomo || true
+      ;;
+    nexusbox)
+      restart_nexusbox
+      ;;
+    *)
+      die "未知 TUN 重启类型：$profile"
+      ;;
+  esac
+}
+
+ensure_kdocs_tun_runtime() {
+  local config_file="$1" profile="$2" stack
+  routing_mode_is_kdocs || return 0
+  [ -c /dev/net/tun ] || die "缺少 /dev/net/tun。"
+  stack="$(detect_tun_stack "$config_file" || true)"
+
+  if wait_for_tun_runtime; then
+    say "KDocs TUN 已启动：Meta（stack=${stack:-unknown}）"
+    return 0
+  fi
+
+  if [ "$stack" = "gvisor" ]; then
+    die "gVisor TUN 仍未创建 Meta 网卡，请检查 LXC TUN 权限。"
+  fi
+
+  say "${stack:-System} TUN 启动失败，自动完整重启并回退到 gVisor 兼容栈。"
+  backup_file "$config_file"
+  set_yaml_section_scalar "$config_file" "tun" "stack" "gvisor"
+  case "$profile" in
+    standalone) "$MIHOMO_BIN" -t -d "$CONFIG_DIR" ;;
+    nexusbox) "$NEXUSBOX_CORE" -t -d "$NEXUSBOX_CONFIG_DIR" ;;
+    *) die "未知 TUN 配置类型：$profile" ;;
+  esac
+  restart_for_tun_stack "$profile"
+  wait_for_tun_runtime || die "System 和 gVisor TUN 都未能创建 Meta 网卡，请检查 /dev/net/tun 与 LXC 权限。"
+  say "已自动回退并启用 gVisor TUN。"
 }
 
 verify_transparent_runtime() {
@@ -1191,32 +1271,13 @@ verify_transparent_runtime() {
   say "TCP 透明代理验证正常：PREROUTING -> ${redir_port}"
 }
 
-reload_nexusbox_core_direct() {
-  local config_file="${1:-${NEXUSBOX_CONFIG_DIR}/config.yaml}"
-  local socket="/opt/nexusbox/var/core.sock"
-  local body
-  body="$(printf '{"path":"%s","payload":""}' "$config_file")"
-
-  for _ in $(seq 1 20); do
-    [ -S "$socket" ] && break
-    sleep 1
-  done
-  [ -S "$socket" ] || die "缺少 Mihomo 控制接口套接字：$socket"
-
-  curl -fsS --unix-socket "$socket" \
-    -X PUT "http://localhost/configs?force=true" \
-    -H "Content-Type: application/json" \
-    -d "$body" >/dev/null || die "通过 $socket 重载 Mihomo 配置失败。"
-  say "Mihomo 配置热重载接口验证正常"
-}
-
 json_string_value() {
   local file="$1" key="$2"
   [ -f "$file" ] || return 0
   sed -n -E "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"([^\"]*)\".*/\1/p" "$file" | head -1
 }
 
-verify_nexusbox_hot_reload_api() {
+verify_nexusbox_control_api() {
   local config_json="${NEXUSBOX_CONFIG_DIR}/nexusbox.json"
   local user pass cookie
   user="$(json_string_value "$config_json" "username")"
@@ -1241,8 +1302,8 @@ verify_nexusbox_hot_reload_api() {
       return 0
     }
 
-  curl -fsS -b "$cookie" -X PUT "http://127.0.0.1:18080/configs" >/dev/null || die "NexusBox UI 热重载接口失败，通常表示 NexusBox 二进制未兼容当前 Mihomo。"
-  say "NexusBox UI 热重载接口验证正常"
+  curl -fsS -b "$cookie" "http://127.0.0.1:18080/configs" >/dev/null || die "NexusBox UI 控制接口失败，通常表示 NexusBox 二进制未兼容当前 Mihomo。"
+  say "NexusBox UI 控制接口验证正常（未热重载 TUN）"
 }
 
 verify_standalone_running() {
@@ -1259,7 +1320,7 @@ verify_standalone_running() {
   verify_dns_runtime "$CONFIG_FILE"
   verify_transparent_runtime "$CONFIG_FILE"
   verify_forwarding_runtime
-  verify_tun_runtime
+  verify_tun_runtime "$CONFIG_FILE"
 }
 
 verify_nexusbox_running() {
@@ -1268,12 +1329,11 @@ verify_nexusbox_running() {
   wait_for_port 18080 "NexusBox 管理页面"
   wait_for_port 7890 "Mihomo HTTP/SOCKS 代理"
   wait_for_port 9090 "Mihomo 控制接口"
-  reload_nexusbox_core_direct "${NEXUSBOX_CONFIG_DIR}/config.yaml"
-  verify_nexusbox_hot_reload_api
+  verify_nexusbox_control_api
   verify_dns_runtime "${NEXUSBOX_CONFIG_DIR}/config.yaml"
   verify_transparent_runtime "${NEXUSBOX_CONFIG_DIR}/config.yaml"
   verify_forwarding_runtime
-  verify_tun_runtime
+  verify_tun_runtime "${NEXUSBOX_CONFIG_DIR}/config.yaml"
 }
 
 install_standalone_mihomo() {
@@ -1351,6 +1411,7 @@ EOF
 
   systemctl daemon-reload
   systemctl enable --now mihomo
+  ensure_kdocs_tun_runtime "$CONFIG_FILE" "standalone"
   write_rc_local_nat "$(detect_egress_iface)" "$(detect_dns_listen_port "$CONFIG_FILE" || true)" "$(detect_redir_port "$CONFIG_FILE" || true)"
   verify_standalone_running
 }
@@ -1410,8 +1471,7 @@ fix_nexusbox_core() {
 
   write_rc_local_nat "$(detect_egress_iface)" "$(detect_dns_listen_port "${NEXUSBOX_CONFIG_DIR}/config.yaml" || true)" "$(detect_redir_port "${NEXUSBOX_CONFIG_DIR}/config.yaml" || true)"
   restart_nexusbox
-
-  reload_nexusbox_core_direct "${NEXUSBOX_CONFIG_DIR}/config.yaml"
+  ensure_kdocs_tun_runtime "${NEXUSBOX_CONFIG_DIR}/config.yaml" "nexusbox"
   verify_nexusbox_running
 }
 
@@ -1430,11 +1490,19 @@ install_nexusbox_from_url() {
 }
 
 print_report() {
+  local report_config tun_stack
+  if [ "$INSTALL_PROFILE" = "nexusbox" ]; then
+    report_config="${NEXUSBOX_CONFIG_DIR}/config.yaml"
+  else
+    report_config="$CONFIG_FILE"
+  fi
+  tun_stack="$(detect_tun_stack "$report_config" 2>/dev/null || true)"
   say "安装完成报告"
   echo "CPU 架构：$(uname -m)"
   echo "核心类型：${CORE_KIND:-未知}"
   echo "安装类型：${INSTALL_PROFILE:-未知}"
   echo "路由模式：$ROUTING_MODE"
+  echo "TUN 协议栈：${tun_stack:-未启用}"
   echo "出口网卡：$(detect_egress_iface)"
   echo "IPv4 转发：$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || true)"
   echo "IPv6 转发：$(cat /proc/sys/net/ipv6/conf/all/forwarding 2>/dev/null || true)"
