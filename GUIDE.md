@@ -171,7 +171,7 @@ curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc
 
 更新脚本也会移除旧版的 TikTok UDP 拒绝规则。更新后在 TikTok 分组选择确认支持 UDP 且真实连接正常的新加坡、日本或美国节点，再完全关闭 iPhone TikTok 后重新打开。仅测速正常并不代表节点可用；如果日志出现 `503 Service Unavailable`，请更换到另一家订阅的节点。
 
-如果日志已显示 `api16-core.tiktokv.com` 或 `api22-core.tiktokv.com` 正确走 TikTok 节点，但 App 仍提示“无网络连接”，应检查设备地区而不是继续修改规则。TikTok 会结合 SIM 卡地区、出口 IP 和系统设置判断位置；开启飞行模式或关闭蜂窝数据不一定会隐藏已安装 SIM/eSIM 的归属地区。请先关闭 TikTok，移除大陆实体 SIM（或停用大陆 eSIM），重启手机后仅连接 Wi-Fi 测试；仍失败时再备份草稿并使用非大陆 App Store 账号重新安装 TikTok。
+如果日志已显示 `api16-core.tiktokv.com` 或 `api22-core.tiktokv.com` 正确走 TikTok 节点，但 App 仍提示“无网络连接”，先在同一手机上用本地 VPN 客户端和同一条节点做对照。若本地 VPN 可以正常使用，说明节点和 SIM 不是主要问题，应排查 KDocs 模式未接管的固定 IP、IPv6、加密 DNS 或其他 UDP 流量，并为该终端改用能够接管完整 TCP/UDP 的网关方案。若本地 VPN 同样失败，再检查设备地区；TikTok 会结合 SIM 卡地区、出口 IP 和系统设置判断位置，开启飞行模式或关闭蜂窝数据不一定会隐藏已安装 SIM/eSIM 的归属地区。
 
 ### core.sock 不存在
 
