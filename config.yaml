@@ -304,8 +304,6 @@ rules:
   - RULE-SET,GameDownload-CN,全球直连
   - RULE-SET,Microsoft-CN,全球直连
   - RULE-SET,Apple,苹果服务
-  # iOS TikTok 优先拒绝 QUIC，使节点 UDP 不稳定时快速回退到 HTTPS/TCP。
-  - AND,((NETWORK,UDP),(DST-PORT,443),(RULE-SET,TikTok-iOS)),REJECT
   - RULE-SET,TikTok-iOS,TikTok
   - RULE-SET,TikTok,TikTok
   - RULE-SET,China,全球直连

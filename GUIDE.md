@@ -163,13 +163,13 @@ ROUTING_MODE=gateway bash <(curl -fsSL https://gh-proxy.com/https://raw.githubus
 
 ### iPhone TikTok 一直加载
 
-最新默认配置会叠加 `TikTok-iOS` 域名集、独立代理 DNS，并拒绝 TikTok 的 QUIC `UDP/443` 以触发 TCP 回退。已有 NexusBox 可执行：
+最新默认配置会叠加 `TikTok-iOS` 域名集和独立代理 DNS，同时保留 TikTok 的 UDP/QUIC。实测部分 iOS TikTok 版本在 UDP 被拒绝后不会回退 TCP，而是持续重试并显示“无网络连接”。已有 NexusBox 可执行：
 
 ```bash
 curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-tiktok-routing.sh | bash
 ```
 
-更新后在 TikTok 分组选择新加坡、日本或美国节点，完全关闭 iPhone TikTok 后重新打开。香港节点、节点不支持目标地区、账号/SIM/App Store 地区限制都不是规则本身可以修复的问题。
+更新脚本也会移除旧版的 TikTok UDP 拒绝规则。更新后在 TikTok 分组选择确认支持 UDP 且真实连接正常的新加坡、日本或美国节点，再完全关闭 iPhone TikTok 后重新打开。仅测速正常并不代表节点可用；如果日志出现 `503 Service Unavailable`，请更换到另一家订阅的节点。账号、SIM、App Store 和系统地区限制也不是规则本身可以修复的问题。
 
 ### core.sock 不存在
 

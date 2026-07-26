@@ -69,14 +69,11 @@ download_rule || die "TikTok iOS 规则下载失败。"
 
 provider_present=0
 grep -q '^  TikTok-iOS:' "$CONFIG_FILE" && provider_present=1
-reject_present=0
-grep -Fqx '  - AND,((NETWORK,UDP),(DST-PORT,443),(RULE-SET,TikTok-iOS)),REJECT' "$CONFIG_FILE" && reject_present=1
 route_present=0
 grep -Fqx '  - RULE-SET,TikTok-iOS,TikTok' "$CONFIG_FILE" && route_present=1
 
 awk \
   -v provider_present="$provider_present" \
-  -v reject_present="$reject_present" \
   -v route_present="$route_present" '
 function print_proxy_dns(key) {
   print "    \"rule-set:" key "\":"
@@ -95,7 +92,6 @@ BEGIN {
   skip_policy_values = 0
   dns_written = 0
   provider_written = provider_present
-  reject_written = reject_present
   route_written = route_present
 }
 {
@@ -123,11 +119,15 @@ BEGIN {
     skip_policy_values = 0
   }
 
+  if ($0 ~ /^  #[[:space:]]*iOS TikTok .*QUIC.*TCP/) {
+    next
+  }
+
+  if ($0 == "  - AND,((NETWORK,UDP),(DST-PORT,443),(RULE-SET,TikTok-iOS)),REJECT") {
+    next
+  }
+
   if ($0 ~ /^  - RULE-SET,TikTok,TikTok[[:space:]]*$/) {
-    if (!reject_written) {
-      print "  - AND,((NETWORK,UDP),(DST-PORT,443),(RULE-SET,TikTok-iOS)),REJECT"
-      reject_written = 1
-    }
     if (!route_written) {
       print "  - RULE-SET,TikTok-iOS,TikTok"
       route_written = 1
@@ -144,7 +144,7 @@ BEGIN {
   }
 }
 END {
-  if (!dns_written || !provider_written || !reject_written || !route_written) {
+  if (!dns_written || !provider_written || !route_written) {
     exit 42
   }
 }
@@ -154,8 +154,10 @@ mv "$TMP" "$CONFIG_FILE"
 
 grep -q '^    "rule-set:TikTok-iOS":' "$CONFIG_FILE" || die "TikTok iOS DNS 策略写入失败。"
 grep -q '^  TikTok-iOS:' "$CONFIG_FILE" || die "TikTok iOS 规则提供器写入失败。"
-grep -Fqx '  - AND,((NETWORK,UDP),(DST-PORT,443),(RULE-SET,TikTok-iOS)),REJECT' "$CONFIG_FILE" || die "TikTok QUIC 回退规则写入失败。"
 grep -Fqx '  - RULE-SET,TikTok-iOS,TikTok' "$CONFIG_FILE" || die "TikTok iOS 路由规则写入失败。"
+if grep -Fqx '  - AND,((NETWORK,UDP),(DST-PORT,443),(RULE-SET,TikTok-iOS)),REJECT' "$CONFIG_FILE"; then
+  die "旧版 TikTok UDP 拒绝规则移除失败。"
+fi
 
 "$CORE_BIN" -t -d "$(dirname "$CONFIG_FILE")"
 say "Mihomo 配置校验通过。"
@@ -167,9 +169,8 @@ curl -fsS --unix-socket "$CORE_SOCKET" \
   -d "$payload" >/dev/null
 
 curl -fsS --unix-socket "$CORE_SOCKET" -X POST 'http://localhost/cache/dns/flush' >/dev/null
-curl -fsS --unix-socket "$CORE_SOCKET" -X POST 'http://localhost/cache/fakeip/flush' >/dev/null
 curl -fsS --unix-socket "$CORE_SOCKET" -X DELETE 'http://localhost/connections' >/dev/null
 
 trap - ERR
-say "TikTok iOS 域名、代理 DNS 和 QUIC 回退规则已生效。"
+say "TikTok iOS 域名、代理 DNS 和 UDP 直通规则已生效。"
 say "请在 TikTok 分组选择新加坡、日本或美国节点，然后在 iPhone 上完全关闭 TikTok 后重新打开。"
