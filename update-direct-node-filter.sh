@@ -10,8 +10,9 @@ FILTER='exclude-filter: "(?i)(直连|direct)"'
 STABLE_PROXY_NAME='稳定优选'
 URLTEST_LINE='UrlTest: &UrlTest {type: url-test, proxies: [DIRECT], interval: 300, tolerance: 50, lazy: false, url: '\''https://www.gstatic.com/generate_204'\'', disable-udp: false, timeout: 5000, max-failed-times: 2, hidden: true, include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: "(?i)(直连|direct)"}'
 STABLE_GROUP_LINE="  - {name: 稳定优选, type: fallback, proxies: [香港节点, 美国节点, 台湾节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}"
-GOOGLE_GROUP_LINE="  - {name: 谷歌服务, type: fallback, proxies: [香港节点, 美国节点, 台湾节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png'}"
-YOUTUBE_GROUP_LINE="  - {name: YouTube, type: fallback, proxies: [香港节点, 美国节点, 台湾节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png'}"
+GOOGLE_GROUP_LINE="  - {name: 谷歌服务, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.google.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png'}"
+YOUTUBE_GROUP_LINE="  - {name: YouTube, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.youtube.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png'}"
+HK_FAST_GROUP_LINE="  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: \"(?i)(直连|direct|专线|住宅|hy2|hysteria)\", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png'}"
 CHROME_RULE_MARKER='- DOMAIN,chromewebstore.google.com,美国节点'
 BACKUP="${CONFIG_FILE}.bak-$(date +%Y%m%d-%H%M%S)"
 
@@ -70,7 +71,8 @@ ensure_routing_groups() {
     -v urltest_line="$URLTEST_LINE" \
     -v stable_group_line="$STABLE_GROUP_LINE" \
     -v google_group_line="$GOOGLE_GROUP_LINE" \
-    -v youtube_group_line="$YOUTUBE_GROUP_LINE" '
+    -v youtube_group_line="$YOUTUBE_GROUP_LINE" \
+    -v hk_fast_group_line="$HK_FAST_GROUP_LINE" '
     function prepend_stable(line) {
       gsub(/[[:space:]]*稳定优选[[:space:]]*,?[[:space:]]*/, "", line)
       gsub(/,[[:space:]]*\]/, "]", line)
@@ -78,7 +80,7 @@ ensure_routing_groups() {
       return line
     }
     BEGIN {
-      anchor = stable = google = youtube = 0
+      anchor = stable = google = youtube = hk_fast = 0
       node_select = ai = telegram = fallback_select = 0
     }
     /^# 锚点 - 时延优选参数/ { next }
@@ -126,9 +128,16 @@ ensure_routing_groups() {
       youtube = 1
       next
     }
+    /name: 香港高速,/ { next }
+    /name: 香港节点,/ {
+      print
+      print hk_fast_group_line
+      hk_fast = 1
+      next
+    }
     { print }
     END {
-      if (!(anchor && stable && google && youtube && node_select && ai && telegram && fallback_select)) {
+      if (!(anchor && stable && google && youtube && hk_fast && node_select && ai && telegram && fallback_select)) {
         exit 1
       }
     }
@@ -255,6 +264,10 @@ grep -Fxq "$YOUTUBE_GROUP_LINE" "$CONFIG_FILE" || {
   restore_backup
   die "YouTube 回退组校验失败。"
 }
+grep -Fxq "$HK_FAST_GROUP_LINE" "$CONFIG_FILE" || {
+  restore_backup
+  die "香港高速节点组校验失败。"
+}
 
 for group in '节点选择' '人工智能' 'Telegram' '漏网之鱼'; do
   grep -F "name: ${group}," "$CONFIG_FILE" | grep -Fq 'proxies: [稳定优选,' || {
@@ -286,7 +299,8 @@ if ! select_stable_proxies; then
 fi
 
 say "更新完成：区域节点每 5 分钟测速，并排除名称含“直连/direct”的节点。"
-say "稳定优选仅使用香港、美国和台湾节点，并按此顺序自动故障接管。"
+say "YouTube 和 Google 已使用香港高速、新加坡、日本、台湾、美国跨地区测速。"
+say "香港高速组已排除专线、住宅、直连、HY2 和 Hysteria 名称的节点。"
 say "Chrome Web Store 已固定使用美国节点。"
 if [ "$DRY_RUN" = "1" ]; then
   say "DRY_RUN=1，运行中的代理组未执行切换。"

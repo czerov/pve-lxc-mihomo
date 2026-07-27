@@ -129,7 +129,7 @@ pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https:
 - 排除名称含“直连/direct”的自动测速节点。
 - 将区域测速调整为每 5 分钟执行，降低大量订阅节点的探测压力。
 - 新增“稳定优选”：仅使用香港、美国和台湾节点，并按此顺序自动故障接管。
-- 让 Google、YouTube、人工智能、Telegram 和默认代理使用“稳定优选”。
+- 让 Google、YouTube 使用排除专线/住宅/HY2 的跨地区自动测速；人工智能、Telegram 和默认代理继续使用“稳定优选”。
 - 将 Chrome Web Store 和扩展更新流量固定到美国节点。
 - 自动清理历史版本可能遗留在 `proxy-providers` 后的重复 Chrome/Google 规则。
 - 校验并热重载配置，失败时恢复备份。
@@ -146,6 +146,14 @@ pct exec <CTID> -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/htt
 脚本会备份当前 YAML、修复重复监听端口、完整重启核心并验证 TUN；若 `System` 无法启动，会自动回退 `gVisor`。在 LXC 容器内部执行时，去掉前面的 `pct exec <CTID> -- bash -c` 即可。
 
 ## 其他维护脚本
+
+更新 X、Instagram、YouTube、Google 高速分流：
+
+```bash
+pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-social-speed.sh | bash'
+```
+
+该脚本会增加“香港高速”和“社交媒体”自动测速组，排除名称含专线、住宅、直连、HY2 或 Hysteria 的节点，并为 X、Instagram/Meta 写入专用域名规则。执行前会备份配置，配置校验或热重载失败时自动恢复。
 
 仅更新 NexusBox 修补版：
 

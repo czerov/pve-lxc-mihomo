@@ -180,6 +180,16 @@ ROUTING_MODE=gateway bash <(curl -fsSL https://gh-proxy.com/https://raw.githubus
 
 ## 常见问题
 
+### iPhone X、YouTube 或 Instagram 加载慢
+
+如果日志显示这些应用落入“漏网之鱼”，或实际使用 Hysteria2 香港住宅节点，可在 LXC 容器内执行：
+
+```bash
+curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-social-speed.sh | bash
+```
+
+脚本会让 X、Instagram/Meta 使用“社交媒体”组，让 YouTube 和 Google 使用跨地区自动测速，并新增排除专线、住宅、直连、HY2/Hysteria 名称的“香港高速”组。更新后完全关闭相关 App 再重新打开。
+
 ### iPhone TikTok 一直加载
 
 最新默认配置会叠加 `TikTok-iOS` 域名集和独立代理 DNS，同时保留 TikTok 的 UDP/QUIC。实测部分 iOS TikTok 版本在 UDP 被拒绝后不会回退 TCP，而是持续重试并显示“无网络连接”。已有 NexusBox 可执行：

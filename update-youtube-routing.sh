@@ -4,6 +4,7 @@ set -Eeuo pipefail
 CONFIG_FILE="${CONFIG_FILE:-/opt/config/config.yaml}"
 CORE_BIN="${CORE_BIN:-/opt/mihomo/mihomo}"
 CORE_SOCKET="${CORE_SOCKET:-/opt/nexusbox/var/core.sock}"
+DRY_RUN="${DRY_RUN:-0}"
 STAMP="$(date '+%Y%m%d-%H%M%S')"
 BACKUP="${CONFIG_FILE}.bak-youtube-${STAMP}"
 TMP="${CONFIG_FILE}.tmp-youtube-${STAMP}"
@@ -35,10 +36,10 @@ restore_backup() {
 
 trap 'restore_backup' ERR
 
-[ "$(id -u)" -eq 0 ] || die "请使用 root 运行。"
+[ "$(id -u)" -eq 0 ] || [ "$DRY_RUN" = "1" ] || die "请使用 root 运行。"
 [ -s "$CONFIG_FILE" ] || die "找不到配置文件：$CONFIG_FILE"
-[ -x "$CORE_BIN" ] || die "找不到 Mihomo 核心：$CORE_BIN"
-[ -S "$CORE_SOCKET" ] || die "找不到 Mihomo 控制套接字：$CORE_SOCKET"
+[ -x "$CORE_BIN" ] || [ "$DRY_RUN" = "1" ] || die "找不到 Mihomo 核心：$CORE_BIN"
+[ -S "$CORE_SOCKET" ] || [ "$DRY_RUN" = "1" ] || die "找不到 Mihomo 控制套接字：$CORE_SOCKET"
 
 grep -q '^  nameserver-policy:' "$CONFIG_FILE" ||
   die "当前配置没有 nameserver-policy，请先更新到项目的 Telegram/TikTok DNS 修复版本。"
@@ -67,10 +68,13 @@ function print_youtube_dns() {
   print "      - \"https://1.1.1.1/dns-query#谷歌服务\""
 }
 function print_youtube_group() {
-  print "  - {name: YouTube, !!merge <<: *UrlTest, proxies: [], filter: *FilterAll, exclude-filter: \"(?i)(hy2|hysteria2).*(港|hk|hong|hkg).*直连\", interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png\"}"
+  print "  - {name: YouTube, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: \"https://www.youtube.com/generate_204\", interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png\"}"
 }
 function print_google_group() {
-  print "  - {name: 谷歌服务, !!merge <<: *UrlTest, proxies: [], filter: *FilterAll, exclude-filter: \"(?i)(hy2|hysteria2).*(港|hk|hong|hkg).*直连\", interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png\"}"
+  print "  - {name: 谷歌服务, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: \"https://www.google.com/generate_204\", interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png\"}"
+}
+function print_hk_fast_group() {
+  print "  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: \"(?i)(直连|direct|专线|住宅|hy2|hysteria)\", icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png\"}"
 }
 BEGIN {
   in_dns = 0
@@ -79,6 +83,7 @@ BEGIN {
   dns_written = 0
   group_written = 0
   google_written = 0
+  hk_fast_written = 0
 }
 {
   if ($0 ~ /^dns:[[:space:]]*$/) {
@@ -138,6 +143,17 @@ BEGIN {
     next
   }
 
+  if ($0 ~ /^  - \{name: 香港高速,/) {
+    next
+  }
+
+  if ($0 ~ /^  - \{name: 香港节点,/) {
+    print
+    print_hk_fast_group()
+    hk_fast_written = 1
+    next
+  }
+
   print
 }
 END {
@@ -145,7 +161,7 @@ END {
     print_youtube_dns()
     dns_written = 1
   }
-  if (!dns_written || !group_written || !google_written) {
+  if (!dns_written || !group_written || !google_written || !hk_fast_written) {
     exit 42
   }
 }
@@ -159,22 +175,25 @@ grep -q 'dns-query#YouTube' "$CONFIG_FILE" || die "YouTube DNS 代理组写入�
 grep -q 'dns-query#谷歌服务' "$CONFIG_FILE" || die "Google DNS 代理组写入失败。"
 grep -q 'name: YouTube,' "$CONFIG_FILE" ||
   die "YouTube 自动测速组写入失败。"
-grep -q 'name: YouTube,.*exclude-filter:.*hy2.*hysteria2.*直连' "$CONFIG_FILE" ||
-  die "YouTube Hysteria2 香港直连节点排除规则写入失败。"
-grep -q 'name: YouTube,.*proxies: \[\]' "$CONFIG_FILE" ||
-  die "YouTube DIRECT 排除规则写入失败。"
-grep -q 'name: 谷歌服务,.*exclude-filter:.*hy2.*hysteria2.*直连' "$CONFIG_FILE" ||
-  die "Google Hysteria2 香港直连节点排除规则写入失败。"
-grep -q 'name: 谷歌服务,.*proxies: \[\]' "$CONFIG_FILE" ||
-  die "Google DIRECT 排除规则写入失败。"
+grep -q 'name: YouTube,.*proxies: \[香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点\]' "$CONFIG_FILE" ||
+  die "YouTube 跨地区测速组写入失败。"
+grep -q 'name: 谷歌服务,.*proxies: \[香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点\]' "$CONFIG_FILE" ||
+  die "Google 跨地区测速组写入失败。"
+grep -q 'name: 香港高速,.*exclude-filter:.*直连.*direct.*专线.*住宅.*hy2.*hysteria' "$CONFIG_FILE" ||
+  die "香港高速节点排除规则写入失败。"
 grep -q '^  - RULE-SET,YouTube,YouTube$' "$CONFIG_FILE" ||
   die "YouTube 规则目标修改失败。"
 grep -q '^  - RULE-SET,Google,谷歌服务$' "$CONFIG_FILE" ||
   die "Google 规则目标修改失败。"
 
+if [ "$DRY_RUN" = "1" ]; then
+  trap - ERR
+  say "DRY_RUN=1，已完成文件修改与结构校验，跳过内核验证和热重载。"
+  exit 0
+fi
+
 "$CORE_BIN" -t -d "$(dirname "$CONFIG_FILE")"
 say "Mihomo 配置校验通过。"
-
 payload="$(printf '{"path":"%s","payload":""}' "$CONFIG_FILE")"
 curl -fsS --unix-socket "$CORE_SOCKET" \
   -X PUT 'http://localhost/configs?force=true' \
@@ -189,5 +208,5 @@ curl -fsS --unix-socket "$CORE_SOCKET" \
   -X DELETE 'http://localhost/connections' >/dev/null
 
 trap - ERR
-say "YouTube/Google 自动测速、专用境外 DNS、DIRECT 与 Hysteria2 香港直连排除策略已生效。"
+say "YouTube/Google 跨地区自动测速、专用境外 DNS和香港高速节点排除策略已生效。"
 say "请完全关闭 YouTube/Google 应用后重新打开；必要时断开并重新连接 Wi-Fi。"
