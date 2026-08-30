@@ -10,7 +10,7 @@ BACKUP="${CONFIG_FILE}.bak-social-speed-${STAMP}"
 TMP_GROUPS="${CONFIG_FILE}.tmp-social-groups-${STAMP}"
 TMP_RULES="${CONFIG_FILE}.tmp-social-rules-${STAMP}"
 
-SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.gstatic.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
+SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
 GOOGLE_GROUP_LINE="  - {name: 谷歌服务, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.google.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png'}"
 YOUTUBE_GROUP_LINE="  - {name: YouTube, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.youtube.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png'}"
 HK_FAST_GROUP_LINE="  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: \"(?i)(直连|direct|专线|住宅|hy2|hysteria)\", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png'}"

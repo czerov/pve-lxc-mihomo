@@ -147,13 +147,21 @@ pct exec <CTID> -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/htt
 
 ## 其他维护脚本
 
+修复 X 一直加载、韩国节点误匹配和 GHCR/容器镜像下载缓慢：
+
+```bash
+pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-routing-performance.sh | bash'
+```
+
+该脚本会让 X 使用 `api.x.com` 做目标站可用性测速，避免选中只能访问 Google 测速页但无法访问 X API/CDN 的节点；同时修复短代码 `KR` 误匹配普通节点名称，并为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立镜像下载组。配置校验或热重载失败时自动恢复。
+
 更新 X、Instagram、YouTube、Google 高速分流：
 
 ```bash
 pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-social-speed.sh | bash'
 ```
 
-该脚本会增加“香港高速”和“社交媒体”自动测速组，排除名称含专线、住宅、直连、HY2 或 Hysteria 的节点，并为 X、Instagram/Meta 写入专用域名规则。执行前会备份配置，配置校验或热重载失败时自动恢复。
+该脚本会增加“香港高速”和“社交媒体”自动测速组；“社交媒体”使用 `api.x.com` 检查目标站可用性，香港高速组排除名称含专线、住宅、直连、HY2 或 Hysteria 的节点，并为 X、Instagram/Meta 写入专用域名规则。执行前会备份配置，配置校验或热重载失败时自动恢复。
 
 仅更新 NexusBox 修补版：
 

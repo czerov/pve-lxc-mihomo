@@ -2,7 +2,7 @@
 FilterHK: &FilterHK "^(?=.*(?<!深)(港|HK|(?i)Hong))(?!(.*(台|本|坡|美))).*$"
 FilterSG: &FilterSG '^(?=.*(?i)(坡|🇸🇬|SG|Sing|SIN|XSP)).*$'
 FilterJP: &FilterJP '^(?=.*(?i)(日|🇯🇵|JP|Japan|NRT|HND|KIX|CTS|FUK)).*$'
-FilterKR: &FilterKR '^(?=.*(?i)(韩|🇰🇷|韓|首尔|南朝鲜|KR|KOR|Korea|South)).*$'
+FilterKR: &FilterKR '^(?=.*(?i)(韩|🇰🇷|韓|首尔|南朝鲜|Korea|South|(^|[^A-Za-z])(KR|KOR)([^A-Za-z]|$))).*$'
 FilterUS: &FilterUS '^(?=.*(?i)(美|UWest|UEast|🇺🇸|US|USA|JFK|LAX|ORD|ATL|DFW|SFO|MIA|SEA|IAD)).*$'
 FilterTW: &FilterTW '^(?=.*(?i)(台|🇼🇸|🇹🇼|TW|tai|TPE|TSA|KHH)).*$'
 FilterEU: &FilterEU '^(?=.*(?i)(奥|比|保|克罗地亚|塞|捷|丹|爱沙|芬|法|德|希|匈|爱尔|意|拉|立|卢|马其它|荷|波|葡|罗|斯洛伐|斯洛文|西|瑞|英|🇧🇪|🇨🇿|🇩🇰|🇫🇮|🇫🇷|🇩🇪|🇮🇪|🇮🇹|🇱🇹|🇱🇺|🇳🇱|🇵🇱|🇸🇪|🇬🇧|CDG|FRA|AMS|MAD|BCN|FCO|MUC|BRU)).*$'
@@ -164,7 +164,8 @@ dns:
 proxies: []
 
 proxy-groups:
-  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.gstatic.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}
+  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}
+  - {name: 容器镜像, type: url-test, proxies: [美国节点, 日本节点, 韩国节点, 台湾节点, 新加坡节点, 高级节点], url: 'https://pkg-containers.githubusercontent.com/', interval: 300, tolerance: 100, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false}
   - {name: 节点选择, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Filter.png', proxies: [稳定优选, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 省流节点, 高级节点, 手动切换, 全球直连, 机场节点]}
   - {name: 手动切换, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Clubhouse.png', proxies: [ 台湾节点, 香港节点, 全球直连, 日本节点, 新加坡节点, 美国节点, 韩国节点, 省流节点, 高级节点, 游戏节点, 机场节点]}
   - {name: 漏网之鱼, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Unlock.png', proxies: [稳定优选, 节点选择, 全球直连, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 省流节点, 高级节点, 手动切换, 机场节点]}
@@ -285,6 +286,9 @@ rules:
   - IP-CIDR,1.0.0.1/32,节点选择
   # 域名路由
   - RULE-SET,Spotify,Spotify
+  # GHCR API 与镜像层使用目标站专项测速，避免通用低延迟节点的大文件带宽过低
+  - DOMAIN,ghcr.io,容器镜像
+  - DOMAIN,pkg-containers.githubusercontent.com,容器镜像
   - RULE-SET,Docker,节点选择
   - RULE-SET,GitHub,节点选择
   - RULE-SET,Telegram,Telegram

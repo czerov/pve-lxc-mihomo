@@ -188,7 +188,15 @@ ROUTING_MODE=gateway bash <(curl -fsSL https://gh-proxy.com/https://raw.githubus
 curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-social-speed.sh | bash
 ```
 
-脚本会让 X、Instagram/Meta 使用“社交媒体”组，让 YouTube 和 Google 使用跨地区自动测速，并新增排除专线、住宅、直连、HY2/Hysteria 名称的“香港高速”组。更新后完全关闭相关 App 再重新打开。
+脚本会让 X、Instagram/Meta 使用“社交媒体”组，其中 X 使用 `api.x.com` 而不是 Google 测速页检查节点可用性；YouTube 和 Google 使用各自目标站测速，并新增排除专线、住宅、直连、HY2/Hysteria 名称的“香港高速”组。更新后完全关闭相关 App 再重新打开。
+
+如果 GHCR/飞牛 Docker 构建同时很慢，或韩国节点组出现实际属于其他国家的节点，执行综合修复：
+
+```bash
+curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-routing-performance.sh | bash
+```
+
+该脚本还会修复 `KR` 短代码误匹配，并让 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 使用独立的目标站测速组。
 
 ### iPhone TikTok 一直加载
 
