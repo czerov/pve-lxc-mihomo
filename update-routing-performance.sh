@@ -5,7 +5,7 @@ CONFIG_FILE="${CONFIG_FILE:-/opt/config/config.yaml}"
 CORE_BIN="${CORE_BIN:-/opt/mihomo/mihomo}"
 CORE_SOCKET="${CORE_SOCKET:-/opt/nexusbox/var/core.sock}"
 DRY_RUN="${DRY_RUN:-0}"
-STAMP="$(date '+%Y%m%d-%H%M%S')"
+STAMP="${STAMP:-$(date '+%Y%m%d-%H%M%S')}"
 BACKUP="${CONFIG_FILE}.bak-routing-performance-${STAMP}"
 TMP_GROUPS="${CONFIG_FILE}.tmp-routing-groups-${STAMP}"
 TMP_RULES="${CONFIG_FILE}.tmp-routing-rules-${STAMP}"
@@ -13,9 +13,23 @@ TMP_RULES="${CONFIG_FILE}.tmp-routing-rules-${STAMP}"
 FILTER_KR_LINE="FilterKR: &FilterKR '^(?=.*(?i)(韩|🇰🇷|韓|首尔|南朝鲜|Korea|South|(^|[^A-Za-z])(KR|KOR)([^A-Za-z]|$))).*$'"
 SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
 CONTAINER_GROUP_LINE="  - {name: 容器镜像, type: url-test, proxies: [美国节点, 日本节点, 韩国节点, 台湾节点, 新加坡节点, 高级节点], url: 'https://pkg-containers.githubusercontent.com/', interval: 300, tolerance: 100, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false}"
+AUTO_GROUP_LINE="  - {name: 自动优选, type: url-test, proxies: [香港节点, 新加坡节点, 日本节点, 台湾节点, 韩国节点, 美国节点], url: 'https://www.gstatic.com/generate_204', interval: 120, tolerance: 30, lazy: false, timeout: 5000, max-failed-times: 2, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}"
+SELECT_GROUP_LINE="  - {name: 节点选择, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Filter.png', proxies: [自动优选, 稳定优选, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 省流节点, 高级节点, 手动切换, 全球直连, 机场节点]}"
+CATCH_ALL_GROUP_LINE="  - {name: 漏网之鱼, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Unlock.png', proxies: [自动优选, 稳定优选, 节点选择, 全球直连, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 省流节点, 高级节点, 手动切换, 机场节点]}"
+FALLBACK_GROUP_LINE="  - {name: 稳定优选, type: fallback, proxies: [自动优选, 香港节点, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}"
 
 say() {
   printf '[%s] %s\n' "$(date '+%F %T')" "$*"
+}
+
+has_exact_line() {
+  local expected="$1"
+
+  awk -v expected="$expected" '
+    { sub(/\r$/, "") }
+    $0 == expected { found = 1; exit }
+    END { exit !found }
+  ' "$CONFIG_FILE"
 }
 
 cleanup_temp() {
@@ -82,9 +96,14 @@ say "已备份：$BACKUP"
 awk \
   -v filter_kr="$FILTER_KR_LINE" \
   -v social_group="$SOCIAL_GROUP_LINE" \
-  -v container_group="$CONTAINER_GROUP_LINE" '
+  -v container_group="$CONTAINER_GROUP_LINE" \
+  -v auto_group="$AUTO_GROUP_LINE" \
+  -v select_group="$SELECT_GROUP_LINE" \
+  -v catch_all_group="$CATCH_ALL_GROUP_LINE" \
+  -v fallback_group="$FALLBACK_GROUP_LINE" '
   BEGIN {
-    filter_written = social_written = container_written = 0
+    filter_written = social_written = container_written = auto_written = 0
+    select_written = catch_all_written = fallback_written = 0
   }
   /^FilterKR:/ {
     print filter_kr
@@ -95,14 +114,31 @@ awk \
     print
     print social_group
     print container_group
-    social_written = container_written = 1
+    print auto_group
+    social_written = container_written = auto_written = 1
     next
   }
   /^  - \{name: 社交媒体,/ { next }
   /^  - \{name: 容器镜像,/ { next }
+  /^  - \{name: 自动优选,/ { next }
+  /^  - \{name: 节点选择,/ {
+    print select_group
+    select_written = 1
+    next
+  }
+  /^  - \{name: 漏网之鱼,/ {
+    print catch_all_group
+    catch_all_written = 1
+    next
+  }
+  /^  - \{name: 稳定优选,/ {
+    print fallback_group
+    fallback_written = 1
+    next
+  }
   { print }
   END {
-    if (!(filter_written && social_written && container_written)) {
+    if (!(filter_written && social_written && container_written && auto_written && select_written && catch_all_written && fallback_written)) {
       exit 42
     }
   }
@@ -137,11 +173,15 @@ awk '
 
 mv "$TMP_RULES" "$CONFIG_FILE"
 
-grep -Fxq "$FILTER_KR_LINE" "$CONFIG_FILE" || fail "韩国节点筛选规则校验失败。"
-grep -Fxq "$SOCIAL_GROUP_LINE" "$CONFIG_FILE" || fail "社交媒体分组校验失败。"
-grep -Fxq "$CONTAINER_GROUP_LINE" "$CONFIG_FILE" || fail "容器镜像分组校验失败。"
-grep -Fxq '  - DOMAIN,ghcr.io,容器镜像' "$CONFIG_FILE" || fail "ghcr.io 规则校验失败。"
-grep -Fxq '  - DOMAIN,pkg-containers.githubusercontent.com,容器镜像' "$CONFIG_FILE" || fail "镜像层规则校验失败。"
+has_exact_line "$FILTER_KR_LINE" || fail "韩国节点筛选规则校验失败。"
+has_exact_line "$SOCIAL_GROUP_LINE" || fail "社交媒体分组校验失败。"
+has_exact_line "$CONTAINER_GROUP_LINE" || fail "容器镜像分组校验失败。"
+has_exact_line "$AUTO_GROUP_LINE" || fail "自动优选分组校验失败。"
+has_exact_line "$SELECT_GROUP_LINE" || fail "节点选择分组校验失败。"
+has_exact_line "$CATCH_ALL_GROUP_LINE" || fail "漏网之鱼分组校验失败。"
+has_exact_line "$FALLBACK_GROUP_LINE" || fail "稳定优选分组校验失败。"
+has_exact_line '  - DOMAIN,ghcr.io,容器镜像' || fail "ghcr.io 规则校验失败。"
+has_exact_line '  - DOMAIN,pkg-containers.githubusercontent.com,容器镜像' || fail "镜像层规则校验失败。"
 
 if [ "$DRY_RUN" != "1" ]; then
   "$CORE_BIN" -t -d "$(dirname "$CONFIG_FILE")"
@@ -159,5 +199,5 @@ else
 fi
 
 trap - ERR
-say "更新完成：已修复韩国节点误匹配、X 可用性测速和 GHCR 镜像下载分流。"
+say "更新完成：已启用跨订阅两级自动优选，并修复韩国节点误匹配、X 可用性测速和 GHCR 镜像下载分流。"
 say "备份保留在：$BACKUP"
