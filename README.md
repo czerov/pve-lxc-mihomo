@@ -147,13 +147,13 @@ pct exec <CTID> -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/htt
 
 ## 其他维护脚本
 
-启用三个订阅的两级自动优选，并修复 X 一直加载、韩国节点误匹配和 GHCR/容器镜像下载缓慢：
+启用三个订阅的自动优选，并修复 X 一直加载、韩国节点误匹配和 GHCR/容器镜像下载缓慢：
 
 ```bash
 pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-routing-performance.sh | bash'
 ```
 
-该脚本会新增“自动优选”：各地区组每 5 分钟从全部融合订阅中选出最快节点，顶层每 2 分钟只比较六个地区优胜节点，避免高频重复测试全部节点。“节点选择”“稳定优选”和“漏网之鱼”会优先使用自动优选，同时保留手动切换。脚本还会让 X 使用 `api.x.com` 做目标站可用性测速、修复短代码 `KR` 误匹配，并为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立镜像下载组。配置校验或热重载失败时自动恢复。
+该脚本会新增“自动优选”：每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套代理组健康检查超时和重复探测。“节点选择”“稳定优选”和“漏网之鱼”会优先使用自动优选，同时保留手动切换。脚本还会让 X 使用 `api.x.com` 做目标站可用性测速、修复短代码 `KR` 误匹配，并为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立镜像下载组。配置校验或热重载失败时自动恢复。
 
 更新 X、Instagram、YouTube、Google 高速分流：
 

@@ -196,7 +196,7 @@ curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc
 curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-routing-performance.sh | bash
 ```
 
-该脚本还会修复 `KR` 短代码误匹配，让 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 使用独立的目标站测速组，并新增跨订阅两级“自动优选”。地区组每 5 分钟从全部融合订阅中选优，顶层每 2 分钟只比较六个地区优胜节点；日常使用无需在 200 多个机场节点间手动切换。
+该脚本还会修复 `KR` 短代码误匹配，让 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 使用独立的目标站测速组，并新增跨订阅“自动优选”。它每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套组超时和重复探测；日常使用无需在 200 多个机场节点间手动切换。
 
 ### iPhone TikTok 一直加载
 
