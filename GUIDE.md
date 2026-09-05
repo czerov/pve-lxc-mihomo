@@ -196,16 +196,16 @@ curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc
 curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-routing-performance.sh | bash
 ```
 
-该脚本还会修复 `KR` 短代码误匹配，让 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 优先直连并在直连不可用时自动回退“自动优选”，同时新增跨订阅“自动优选”。它每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套组超时和重复探测；日常使用无需在 200 多个机场节点间手动切换。
+该脚本还会修复 `KR` 短代码误匹配，为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立“容器镜像”测速组，自动选择真实可用的机场节点且不使用 `DIRECT`，同时新增跨订阅“自动优选”。它每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套组超时和重复探测；日常使用无需在 200 多个机场节点间手动切换。
 
-如果 NAS 的 Docker 守护进程另外配置了 Mihomo HTTP 代理，且本机实测 GHCR 直连更快，还需要在 Docker 的 `NO_PROXY` / “不代理域名”中逐行加入：
+NAS 的 Docker 守护进程需要配置 Mihomo HTTP 代理，例如 `http://192.168.5.6:7890/`。`NO_PROXY` / “不代理域名”中不得包含：
 
 ```text
 ghcr.io
 pkg-containers.githubusercontent.com
 ```
 
-飞牛 fnOS 的位置是“Docker -> 镜像仓库 -> 设置 -> 代理设置”。保存并重启 Docker 后，GHCR 流量会真正绕过 `7890`。如果所在网络无法直连 GHCR，请移除这两个排除项，让 Mihomo 自动回退代理。
+飞牛 fnOS 的位置是“Docker -> 镜像仓库 -> 设置 -> 代理设置”。从“不代理域名”移除以上两项，保存并重启 Docker 后，GHCR API 与镜像层流量才会进入 `7890`，再由“容器镜像”组按目标站测速结果自动选择机场节点。
 
 ### iPhone TikTok 一直加载
 
