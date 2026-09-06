@@ -145,6 +145,26 @@ dns:
     - 223.5.5.5
     - 119.29.29.29
   nameserver-policy:
+    "+.x.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.twitter.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.twimg.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.twittercdn.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.t.co": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.pscp.tv": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.periscope.tv": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.tweetdeck.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.instagram.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.cdninstagram.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.facebook.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.facebook.net": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.fbcdn.net": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.fbsbx.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.fb.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.fb.me": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.messenger.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.meta.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.threads.net": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
+    "+.oculus.com": ["https://8.8.8.8/dns-query#节点选择", "https://1.1.1.1/dns-query#节点选择"]
     "rule-set:Telegram":
       - "https://8.8.8.8/dns-query#节点选择"
       - "https://1.1.1.1/dns-query#节点选择"
@@ -164,7 +184,7 @@ dns:
 proxies: []
 
 proxy-groups:
-  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}
+  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 20, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}
   - {name: 容器镜像, type: url-test, proxies: [自动优选], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: "(?i)(DIRECT|直连|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author)", url: 'https://pkg-containers.githubusercontent.com/', interval: 300, tolerance: 100, lazy: false, timeout: 10000, max-failed-times: 2, hidden: false}
   - {name: 自动优选, type: url-test, proxies: [DIRECT], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: "(?i)(DIRECT|直连|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author)", url: 'https://www.gstatic.com/generate_204', interval: 300, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 2, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}
   - {name: 节点选择, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Filter.png', proxies: [自动优选, 稳定优选, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 省流节点, 高级节点, 手动切换, 全球直连, 机场节点]}

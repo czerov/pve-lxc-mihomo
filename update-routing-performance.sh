@@ -9,11 +9,12 @@ STAMP="${STAMP:-$(date '+%Y%m%d-%H%M%S')}"
 BACKUP="${CONFIG_FILE}.bak-routing-performance-${STAMP}"
 TMP_GROUPS="${CONFIG_FILE}.tmp-routing-groups-${STAMP}"
 TMP_RULES="${CONFIG_FILE}.tmp-routing-rules-${STAMP}"
+TMP_DNS="${CONFIG_FILE}.tmp-routing-dns-${STAMP}"
 
 FILTER_KR_LINE="FilterKR: &FilterKR '^(?=.*(?i)(韩|🇰🇷|韓|首尔|南朝鲜|Korea|South|(^|[^A-Za-z])(KR|KOR)([^A-Za-z]|$))).*$'"
 FILTER_NOISE="(?i)(DIRECT|直连|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author)"
 URL_TEST_ANCHOR_LINE="UrlTest: &UrlTest {type: url-test, proxies: [DIRECT], interval: 300, tolerance: 50, lazy: true, url: 'https://www.gstatic.com/generate_204', disable-udp: false, timeout: 5000, max-failed-times: 2, hidden: true, include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: \"(?i)(直连|direct)\"}"
-SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
+SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 20, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
 CONTAINER_GROUP_LINE="  - {name: 容器镜像, type: url-test, proxies: [自动优选], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: \"$FILTER_NOISE\", url: 'https://pkg-containers.githubusercontent.com/', interval: 300, tolerance: 100, lazy: false, timeout: 10000, max-failed-times: 2, hidden: false}"
 AUTO_GROUP_LINE="  - {name: 自动优选, type: url-test, proxies: [DIRECT], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: \"$FILTER_NOISE\", url: 'https://www.gstatic.com/generate_204', interval: 300, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 2, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}"
 AIRPORT_GROUP_LINE="  - {name: 机场节点, type: select, proxies: [DIRECT], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: \"$FILTER_NOISE\", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Airport.png' }"
@@ -38,6 +39,7 @@ has_exact_line() {
 cleanup_temp() {
   [ ! -e "$TMP_GROUPS" ] || rm -f "$TMP_GROUPS"
   [ ! -e "$TMP_RULES" ] || rm -f "$TMP_RULES"
+  [ ! -e "$TMP_DNS" ] || rm -f "$TMP_DNS"
 }
 
 reload_config() {
@@ -96,6 +98,26 @@ grep -q '^  - RULE-SET,Docker,' "$CONFIG_FILE" || fail "找不到 Docker 规则�
 
 cp -a "$CONFIG_FILE" "$BACKUP"
 say "已备份：$BACKUP"
+
+awk '
+  function print_social_dns() {
+    split("x.com twitter.com twimg.com twittercdn.com t.co pscp.tv periscope.tv tweetdeck.com instagram.com cdninstagram.com facebook.com facebook.net fbcdn.net fbsbx.com fb.com fb.me messenger.com meta.com threads.net oculus.com", domains, " ")
+    for (i = 1; i <= 20; i++) {
+      print "    \"+." domains[i] "\": [\"https://8.8.8.8/dns-query#节点选择\", \"https://1.1.1.1/dns-query#节点选择\"]"
+    }
+  }
+  /^  nameserver-policy:[[:space:]]*$/ {
+    print
+    print_social_dns()
+    dns_written = 1
+    next
+  }
+  /^    "\+\.(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com|instagram\.com|cdninstagram\.com|facebook\.com|facebook\.net|fbcdn\.net|fbsbx\.com|fb\.com|fb\.me|messenger\.com|meta\.com|threads\.net|oculus\.com)":/ { next }
+  { print }
+  END { if (!dns_written) exit 42 }
+' "$CONFIG_FILE" >"$TMP_DNS" || fail "生成社交媒体加密 DNS 策略失败。"
+
+mv "$TMP_DNS" "$CONFIG_FILE"
 
 awk \
   -v filter_kr="$FILTER_KR_LINE" \
@@ -201,6 +223,14 @@ has_exact_line "$FALLBACK_GROUP_LINE" || fail "稳定优选分组校验失败。
 has_exact_line '  - DOMAIN,ghcr.io,容器镜像' || fail "ghcr.io 规则校验失败。"
 has_exact_line '  - DOMAIN,pkg-containers.githubusercontent.com,容器镜像' || fail "镜像层规则校验失败。"
 
+for domain in \
+  x.com twitter.com twimg.com twittercdn.com t.co pscp.tv periscope.tv \
+  tweetdeck.com instagram.com cdninstagram.com facebook.com facebook.net \
+  fbcdn.net fbsbx.com fb.com fb.me messenger.com meta.com threads.net oculus.com; do
+  has_exact_line "    \"+.${domain}\": [\"https://8.8.8.8/dns-query#节点选择\", \"https://1.1.1.1/dns-query#节点选择\"]" ||
+    fail "${domain} 加密 DNS 策略校验失败。"
+done
+
 if [ "$DRY_RUN" != "1" ]; then
   "$CORE_BIN" -t -d "$(dirname "$CONFIG_FILE")"
   say "Mihomo 配置校验通过。"
@@ -217,5 +247,5 @@ else
 fi
 
 trap - ERR
-say "更新完成：已启用跨订阅单层自动优选，并修复韩国节点误匹配、X 可用性测速和 GHCR 专用节点测速分流。"
+say "更新完成：已启用跨订阅单层自动优选，并修复韩国节点误匹配、社交应用 DNS 污染和 GHCR 专用节点测速分流。"
 say "备份保留在：$BACKUP"

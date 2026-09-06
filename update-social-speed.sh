@@ -5,12 +5,13 @@ CONFIG_FILE="${CONFIG_FILE:-/opt/config/config.yaml}"
 CORE_BIN="${CORE_BIN:-/opt/mihomo/mihomo}"
 CORE_SOCKET="${CORE_SOCKET:-/opt/nexusbox/var/core.sock}"
 DRY_RUN="${DRY_RUN:-0}"
-STAMP="$(date '+%Y%m%d-%H%M%S')"
+STAMP="${STAMP:-$(date '+%Y%m%d-%H%M%S')}"
 BACKUP="${CONFIG_FILE}.bak-social-speed-${STAMP}"
 TMP_GROUPS="${CONFIG_FILE}.tmp-social-groups-${STAMP}"
 TMP_RULES="${CONFIG_FILE}.tmp-social-rules-${STAMP}"
+TMP_DNS="${CONFIG_FILE}.tmp-social-dns-${STAMP}"
 
-SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
+SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 20, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
 GOOGLE_GROUP_LINE="  - {name: 谷歌服务, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.google.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png'}"
 YOUTUBE_GROUP_LINE="  - {name: YouTube, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.youtube.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png'}"
 HK_FAST_GROUP_LINE="  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: \"(?i)(直连|direct|专线|住宅|hy2|hysteria)\", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png'}"
@@ -22,6 +23,7 @@ say() {
 cleanup_temp() {
   [ ! -e "$TMP_GROUPS" ] || rm -f "$TMP_GROUPS"
   [ ! -e "$TMP_RULES" ] || rm -f "$TMP_RULES"
+  [ ! -e "$TMP_DNS" ] || rm -f "$TMP_DNS"
 }
 
 reload_config() {
@@ -80,6 +82,26 @@ grep -q '^  - RULE-SET,YouTube,' "$CONFIG_FILE" || fail "找不到 YouTube 规�
 
 cp -a "$CONFIG_FILE" "$BACKUP"
 say "已备份：$BACKUP"
+
+awk '
+  function print_social_dns() {
+    split("x.com twitter.com twimg.com twittercdn.com t.co pscp.tv periscope.tv tweetdeck.com instagram.com cdninstagram.com facebook.com facebook.net fbcdn.net fbsbx.com fb.com fb.me messenger.com meta.com threads.net oculus.com", domains, " ")
+    for (i = 1; i <= 20; i++) {
+      print "    \"+." domains[i] "\": [\"https://8.8.8.8/dns-query#节点选择\", \"https://1.1.1.1/dns-query#节点选择\"]"
+    }
+  }
+  /^  nameserver-policy:[[:space:]]*$/ {
+    print
+    print_social_dns()
+    dns_written = 1
+    next
+  }
+  /^    "\+\.(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com|instagram\.com|cdninstagram\.com|facebook\.com|facebook\.net|fbcdn\.net|fbsbx\.com|fb\.com|fb\.me|messenger\.com|meta\.com|threads\.net|oculus\.com)":/ { next }
+  { print }
+  END { if (!dns_written) exit 42 }
+' "$CONFIG_FILE" >"$TMP_DNS" || fail "生成社交媒体加密 DNS 策略失败。"
+
+mv "$TMP_DNS" "$CONFIG_FILE"
 
 awk \
   -v social_group="$SOCIAL_GROUP_LINE" \
@@ -182,6 +204,14 @@ for domain in \
     fail "${domain} 规则校验失败。"
 done
 
+for domain in \
+  x.com twitter.com twimg.com twittercdn.com t.co pscp.tv periscope.tv \
+  tweetdeck.com instagram.com cdninstagram.com facebook.com facebook.net \
+  fbcdn.net fbsbx.com fb.com fb.me messenger.com meta.com threads.net oculus.com; do
+  grep -Fxq "    \"+.${domain}\": [\"https://8.8.8.8/dns-query#节点选择\", \"https://1.1.1.1/dns-query#节点选择\"]" "$CONFIG_FILE" ||
+    fail "${domain} 加密 DNS 策略校验失败。"
+done
+
 if [ "$DRY_RUN" != "1" ]; then
   "$CORE_BIN" -t -d "$(dirname "$CONFIG_FILE")"
   say "Mihomo 配置校验通过。"
@@ -199,5 +229,6 @@ fi
 
 trap - ERR
 say "更新完成：X、Instagram、YouTube、Google 已使用跨地区自动测速组。"
+say "X、Instagram、Meta 域名已强制通过代理加密 DNS 解析，避免国内 DNS 污染。"
 say "香港高速组已排除名称含专线、住宅、直连、HY2 或 Hysteria 的节点。"
 say "备份保留在：$BACKUP"

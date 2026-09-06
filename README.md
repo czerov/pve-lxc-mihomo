@@ -170,7 +170,7 @@ pkg-containers.githubusercontent.com
 pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-social-speed.sh | bash'
 ```
 
-该脚本会增加“香港高速”和“社交媒体”自动测速组；“社交媒体”使用 `api.x.com` 检查目标站可用性，香港高速组排除名称含专线、住宅、直连、HY2 或 Hysteria 的节点，并为 X、Instagram/Meta 写入专用域名规则。执行前会备份配置，配置校验或热重载失败时自动恢复。
+该脚本会增加“香港高速”和“社交媒体”自动测速组；“社交媒体”使用 `api.x.com` 检查目标站可用性，香港高速组排除名称含专线、住宅、直连、HY2 或 Hysteria 的节点，并为 X、Instagram/Meta 写入专用域名规则和代理加密 DNS 策略，避免国内 DNS 返回错误的 CDN 地址。执行前会备份配置，配置校验或热重载失败时自动恢复。
 
 仅更新 NexusBox 修补版：
 
