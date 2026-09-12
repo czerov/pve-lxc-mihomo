@@ -10,7 +10,7 @@ FilterOther: &FilterOther '^(?!.*(DIRECT|美|港|坡|台|新|日|韩|奥|比|保
 FilterVIP: &FilterVIP '(专线|专用|高级|直连|急速|高倍率|IEPL|IPLC|AIA|CTM|CC|iepl|iplc|aia|ctm|cc|AC|x3|X3|x5|X5)'
 FilterBIG: &FilterBIG '(0.[1-5]|低倍率|省流|大流量)'
 FilterGame: &FilterGame "^(?=.*((?i)游戏|\U0001F3AE|(\b(GAME)\b)))(?!.*((?i)回国|校园)).*$"
-FilterAll: &FilterAll '^(?!.*(DIRECT|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author))'
+FilterAll: &FilterAll '^(?!.*(DIRECT|电信推荐|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author))'
 # 锚点 - 规则集
 DomainMrs: &DomainMrs {type: http, interval: 86400, behavior: domain, format: mrs}
 DomainText: &DomainText {type: http, interval: 86400, behavior: domain, format: text}
@@ -20,7 +20,7 @@ IPcidrText: &IPcidrText {type: http, interval: 86400, behavior: ipcidr, format: 
 ClassicalText: &ClassicalText {type: http, interval: 86400, behavior: classical, format: text}
 ClassicalYaml: &ClassicalYaml {type: http, interval: 86400, behavior: classical, format: yaml}
 # 锚点 - 区域节点每 5 分钟测速，避免频繁探测全部订阅节点
-UrlTest: &UrlTest {type: url-test, proxies: [DIRECT], interval: 300, tolerance: 50, lazy: true, url: 'https://www.gstatic.com/generate_204', disable-udp: false, timeout: 5000, max-failed-times: 2, hidden: true, include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: "(?i)(直连|direct)"}
+UrlTest: &UrlTest {type: url-test, proxies: [DIRECT], interval: 300, tolerance: 50, lazy: true, url: 'https://www.gstatic.com/generate_204', disable-udp: false, timeout: 5000, max-failed-times: 2, hidden: true, include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: "(?i)(直连|direct|电信推荐)"}
 
 ## ----全局配置------
 
@@ -184,14 +184,16 @@ dns:
 proxies: []
 
 proxy-groups:
+  - {name: X媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://pbs.twimg.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}
+  - {name: X视频, type: url-test, proxies: [香港高速, 新加坡节点, 美国节点], url: 'https://video-s.twimg.com/video/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}
   - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 20, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}
-  - {name: 容器镜像, type: url-test, proxies: [自动优选], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: "(?i)(DIRECT|直连|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author)", url: 'https://pkg-containers.githubusercontent.com/', interval: 300, tolerance: 100, lazy: false, timeout: 10000, max-failed-times: 2, hidden: false}
-  - {name: 自动优选, type: url-test, proxies: [DIRECT], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: "(?i)(DIRECT|直连|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author)", url: 'https://www.gstatic.com/generate_204', interval: 300, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 2, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}
+  - {name: 容器镜像, type: url-test, proxies: [自动优选], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: "(?i)(DIRECT|直连|电信推荐|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author)", url: 'https://pkg-containers.githubusercontent.com/', interval: 300, tolerance: 100, lazy: false, timeout: 10000, max-failed-times: 2, hidden: false}
+  - {name: 自动优选, type: url-test, proxies: [DIRECT], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: "(?i)(DIRECT|直连|电信推荐|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author)", url: 'https://www.gstatic.com/generate_204', interval: 300, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 2, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}
   - {name: 节点选择, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Filter.png', proxies: [自动优选, 稳定优选, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 省流节点, 高级节点, 手动切换, 全球直连, 机场节点]}
   - {name: 手动切换, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Clubhouse.png', proxies: [ 台湾节点, 香港节点, 全球直连, 日本节点, 新加坡节点, 美国节点, 韩国节点, 省流节点, 高级节点, 游戏节点, 机场节点]}
   - {name: 漏网之鱼, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Unlock.png', proxies: [自动优选, 稳定优选, 节点选择, 全球直连, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 省流节点, 高级节点, 手动切换, 机场节点]}
   - {name: 网络测试, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Speedtest.png', proxies: [ 全球直连, 节点选择, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 省流节点, 高级节点, 手动切换, 机场节点]}
-  - {name: 稳定优选, type: fallback, proxies: [自动优选, 香港节点, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}
+  - {name: 稳定优选, type: fallback, proxies: [香港高速, 美国节点, 台湾节点, 日本节点, 新加坡节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}
   - {name: 谷歌服务, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.google.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png'}
   - {name: YouTube, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.youtube.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png'}
   - {name: 人工智能, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/AI.png', proxies: [稳定优选, 美国节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 香港节点, 省流节点, 高级节点, 手动切换, 全球直连, 机场节点]}
@@ -206,7 +208,7 @@ proxy-groups:
   - {name: 高级节点, !!merge <<: *UrlTest, filter: *FilterVIP, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/VIP.png'}
   - {name: 游戏节点, !!merge <<: *UrlTest, filter: *FilterGame, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Game.png'}
   - {name: 香港节点, !!merge <<: *UrlTest, filter: *FilterHK, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png'}
-  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: "(?i)(直连|direct|专线|住宅|hy2|hysteria)", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png'}
+  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: "(?i)(直连|direct|电信推荐|专线|住宅|hy2|hysteria)", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png'}
   - {name: 新加坡节点, !!merge <<: *UrlTest, filter: *FilterSG, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Singapore.png'}
   - {name: 韩国节点, !!merge <<: *UrlTest, filter: *FilterKR, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Korea.png'}
   - {name: 台湾节点, !!merge <<: *UrlTest, filter: *FilterTW, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/China.png'}
@@ -319,15 +321,16 @@ rules:
   - RULE-SET,Gemini,人工智能
   - RULE-SET,AIDomain,人工智能
   - RULE-SET,AIChat,人工智能
-  # X / Instagram / Meta 使用非 Hysteria2 高速节点
-  - DOMAIN-SUFFIX,x.com,社交媒体
-  - DOMAIN-SUFFIX,twitter.com,社交媒体
-  - DOMAIN-SUFFIX,twimg.com,社交媒体
-  - DOMAIN-SUFFIX,twittercdn.com,社交媒体
-  - DOMAIN-SUFFIX,t.co,社交媒体
-  - DOMAIN-SUFFIX,pscp.tv,社交媒体
-  - DOMAIN-SUFFIX,periscope.tv,社交媒体
-  - DOMAIN-SUFFIX,tweetdeck.com,社交媒体
+  # X 图片、视频和 API 走独立的全订阅自动测速组
+  - DOMAIN-SUFFIX,x.com,X媒体
+  - DOMAIN-SUFFIX,twitter.com,X媒体
+  - DOMAIN-SUFFIX,twimg.com,X视频
+  - DOMAIN-SUFFIX,twittercdn.com,X视频
+  - DOMAIN-SUFFIX,t.co,X媒体
+  - DOMAIN-SUFFIX,pscp.tv,X视频
+  - DOMAIN-SUFFIX,periscope.tv,X视频
+  - DOMAIN-SUFFIX,tweetdeck.com,X媒体
+  # Instagram / Meta 继续使用跨地区社交媒体组
   - DOMAIN-SUFFIX,instagram.com,社交媒体
   - DOMAIN-SUFFIX,cdninstagram.com,社交媒体
   - DOMAIN-SUFFIX,facebook.com,社交媒体

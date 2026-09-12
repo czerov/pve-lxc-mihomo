@@ -74,7 +74,7 @@ function print_google_group() {
   print "  - {name: 谷歌服务, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: \"https://www.google.com/generate_204\", interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png\"}"
 }
 function print_hk_fast_group() {
-  print "  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: \"(?i)(直连|direct|专线|住宅|hy2|hysteria)\", icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png\"}"
+  print "  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: \"(?i)(直连|direct|电信推荐|专线|住宅|hy2|hysteria)\", icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png\"}"
 }
 BEGIN {
   in_dns = 0
@@ -179,7 +179,7 @@ grep -q 'name: YouTube,.*proxies: \[香港高速, 新加坡节点, 日本节点,
   die "YouTube 跨地区测速组写入失败。"
 grep -q 'name: 谷歌服务,.*proxies: \[香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点\]' "$CONFIG_FILE" ||
   die "Google 跨地区测速组写入失败。"
-grep -q 'name: 香港高速,.*exclude-filter:.*直连.*direct.*专线.*住宅.*hy2.*hysteria' "$CONFIG_FILE" ||
+grep -q 'name: 香港高速,.*exclude-filter:.*直连.*direct.*电信推荐.*专线.*住宅.*hy2.*hysteria' "$CONFIG_FILE" ||
   die "香港高速节点排除规则写入失败。"
 grep -q '^  - RULE-SET,YouTube,YouTube$' "$CONFIG_FILE" ||
   die "YouTube 规则目标修改失败。"

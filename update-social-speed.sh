@@ -11,10 +11,12 @@ TMP_GROUPS="${CONFIG_FILE}.tmp-social-groups-${STAMP}"
 TMP_RULES="${CONFIG_FILE}.tmp-social-rules-${STAMP}"
 TMP_DNS="${CONFIG_FILE}.tmp-social-dns-${STAMP}"
 
+X_MEDIA_GROUP_LINE="  - {name: X媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://pbs.twimg.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
+X_VIDEO_GROUP_LINE="  - {name: X视频, type: url-test, proxies: [香港高速, 新加坡节点, 美国节点], url: 'https://video-s.twimg.com/video/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
 SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 20, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
 GOOGLE_GROUP_LINE="  - {name: 谷歌服务, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.google.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png'}"
 YOUTUBE_GROUP_LINE="  - {name: YouTube, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.youtube.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png'}"
-HK_FAST_GROUP_LINE="  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: \"(?i)(直连|direct|专线|住宅|hy2|hysteria)\", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png'}"
+HK_FAST_GROUP_LINE="  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: \"(?i)(直连|direct|电信推荐|专线|住宅|hy2|hysteria)\", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png'}"
 
 say() {
   printf '[%s] %s\n' "$(date '+%F %T')" "$*"
@@ -104,19 +106,27 @@ awk '
 mv "$TMP_DNS" "$CONFIG_FILE"
 
 awk \
+  -v x_media_group="$X_MEDIA_GROUP_LINE" \
+  -v x_video_group="$X_VIDEO_GROUP_LINE" \
   -v social_group="$SOCIAL_GROUP_LINE" \
   -v google_group="$GOOGLE_GROUP_LINE" \
   -v youtube_group="$YOUTUBE_GROUP_LINE" \
   -v hk_fast_group="$HK_FAST_GROUP_LINE" '
   BEGIN {
-    social_written = google_written = youtube_written = hk_fast_written = 0
+    x_media_written = x_video_written = social_written = google_written = youtube_written = hk_fast_written = 0
   }
   /^proxy-groups:[[:space:]]*$/ {
     print
+    print x_media_group
+    print x_video_group
+    x_video_written = 1
+    x_media_written = 1
     print social_group
     social_written = 1
     next
   }
+  /^  - \{name: X媒体,/ { next }
+  /^  - \{name: X视频,/ { next }
   /^  - \{name: 社交媒体,/ { next }
   /^  - \{name: 谷歌服务,/ {
     print google_group
@@ -137,7 +147,7 @@ awk \
   }
   { print }
   END {
-    if (!(social_written && google_written && youtube_written && hk_fast_written)) {
+    if (!(x_media_written && x_video_written && social_written && google_written && youtube_written && hk_fast_written)) {
       exit 42
     }
   }
@@ -147,15 +157,16 @@ mv "$TMP_GROUPS" "$CONFIG_FILE"
 
 awk '
   function print_social_rules() {
-    print "  # X / Instagram / Meta 使用非 Hysteria2 高速节点"
-    print "  - DOMAIN-SUFFIX,x.com,社交媒体"
-    print "  - DOMAIN-SUFFIX,twitter.com,社交媒体"
-    print "  - DOMAIN-SUFFIX,twimg.com,社交媒体"
-    print "  - DOMAIN-SUFFIX,twittercdn.com,社交媒体"
-    print "  - DOMAIN-SUFFIX,t.co,社交媒体"
-    print "  - DOMAIN-SUFFIX,pscp.tv,社交媒体"
-    print "  - DOMAIN-SUFFIX,periscope.tv,社交媒体"
-    print "  - DOMAIN-SUFFIX,tweetdeck.com,社交媒体"
+    print "  # X 图片、视频和 API 走独立的全订阅自动测速组"
+    print "  - DOMAIN-SUFFIX,x.com,X媒体"
+    print "  - DOMAIN-SUFFIX,twitter.com,X媒体"
+    print "  - DOMAIN-SUFFIX,twimg.com,X视频"
+    print "  - DOMAIN-SUFFIX,twittercdn.com,X视频"
+    print "  - DOMAIN-SUFFIX,t.co,X媒体"
+    print "  - DOMAIN-SUFFIX,pscp.tv,X视频"
+    print "  - DOMAIN-SUFFIX,periscope.tv,X视频"
+    print "  - DOMAIN-SUFFIX,tweetdeck.com,X媒体"
+    print "  # Instagram / Meta 继续使用跨地区社交媒体组"
     print "  - DOMAIN-SUFFIX,instagram.com,社交媒体"
     print "  - DOMAIN-SUFFIX,cdninstagram.com,社交媒体"
     print "  - DOMAIN-SUFFIX,facebook.com,社交媒体"
@@ -171,6 +182,9 @@ awk '
   }
   BEGIN { rules_written = youtube_written = 0 }
   /^  # X \/ Instagram \/ Meta 使用非 Hysteria2 高速节点$/ { next }
+  /^  # X 图片、视频和 API 走独立的全订阅自动测速组$/ { next }
+  /^  # Instagram \/ Meta 继续使用跨地区社交媒体组$/ { next }
+  /^  - DOMAIN-SUFFIX,(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com|pscp\.tv|periscope\.tv),(X媒体|X视频)$/ { next }
   /^  - DOMAIN-SUFFIX,(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com|instagram\.com|cdninstagram\.com|facebook\.com|facebook\.net|fbcdn\.net|fbsbx\.com|fb\.com|fb\.me|messenger\.com|meta\.com|threads\.net|oculus\.com),社交媒体$/ { next }
   /^  - RULE-SET,YouTube,/ {
     if (!rules_written) {
@@ -191,6 +205,8 @@ awk '
 
 mv "$TMP_RULES" "$CONFIG_FILE"
 
+grep -Fxq "$X_MEDIA_GROUP_LINE" "$CONFIG_FILE" || fail "X 媒体自动测速组校验失败。"
+grep -Fxq "$X_VIDEO_GROUP_LINE" "$CONFIG_FILE" || fail "X 视频故障接管组校验失败。"
 grep -Fxq "$SOCIAL_GROUP_LINE" "$CONFIG_FILE" || fail "社交媒体自动测速组校验失败。"
 grep -Fxq "$GOOGLE_GROUP_LINE" "$CONFIG_FILE" || fail "谷歌服务自动测速组校验失败。"
 grep -Fxq "$YOUTUBE_GROUP_LINE" "$CONFIG_FILE" || fail "YouTube 自动测速组校验失败。"
@@ -200,7 +216,16 @@ for domain in \
   x.com twitter.com twimg.com twittercdn.com t.co pscp.tv periscope.tv \
   tweetdeck.com instagram.com cdninstagram.com facebook.com facebook.net \
   fbcdn.net fbsbx.com fb.com fb.me messenger.com meta.com threads.net oculus.com; do
-  grep -Fxq "  - DOMAIN-SUFFIX,${domain},社交媒体" "$CONFIG_FILE" ||
+  target_group="社交媒体"
+  case "$domain" in
+    twimg.com|twittercdn.com|pscp.tv|periscope.tv)
+      target_group="X视频"
+      ;;
+    x.com|twitter.com|t.co|tweetdeck.com)
+      target_group="X媒体"
+      ;;
+  esac
+  grep -Fxq "  - DOMAIN-SUFFIX,${domain},${target_group}" "$CONFIG_FILE" ||
     fail "${domain} 规则校验失败。"
 done
 
@@ -228,7 +253,7 @@ else
 fi
 
 trap - ERR
-say "更新完成：X、Instagram、YouTube、Google 已使用跨地区自动测速组。"
+say "更新完成：X 已使用独立目标站自动测速组，Instagram、YouTube、Google 已使用自动测速组。"
 say "X、Instagram、Meta 域名已强制通过代理加密 DNS 解析，避免国内 DNS 污染。"
-say "香港高速组已排除名称含专线、住宅、直连、HY2 或 Hysteria 的节点。"
+say "香港高速组已排除名称含专线、住宅、直连、电信推荐、HY2 或 Hysteria 的节点。"
 say "备份保留在：$BACKUP"

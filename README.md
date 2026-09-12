@@ -127,8 +127,9 @@ pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https:
 该脚本会：
 
 - 排除名称含“直连/direct”的自动测速节点。
+- 排除名称含“电信推荐”的节点，避免不稳定线路进入自动优选、地区测速和容器镜像测速池；手动切换仍可使用这些节点。
 - 将区域测速调整为每 5 分钟执行，降低大量订阅节点的探测压力。
-- 新增“稳定优选”：仅使用香港、美国和台湾节点，并按此顺序自动故障接管。
+- 新增“稳定优选”：不嵌套“自动优选”，按香港高速、美国、台湾、日本、新加坡地区组自动故障接管。
 - 让 Google、YouTube 使用排除专线/住宅/HY2 的跨地区自动测速；人工智能、Telegram 和默认代理继续使用“稳定优选”。
 - 将 Chrome Web Store 和扩展更新流量固定到美国节点。
 - 自动清理历史版本可能遗留在 `proxy-providers` 后的重复 Chrome/Google 规则。
@@ -153,7 +154,7 @@ pct exec <CTID> -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/htt
 pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-routing-performance.sh | bash'
 ```
 
-该脚本会新增“自动优选”：每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套代理组健康检查超时和重复探测。“节点选择”“稳定优选”和“漏网之鱼”会优先使用自动优选，同时保留手动切换。脚本还会让 X 使用 `api.x.com` 做目标站可用性测速、修复短代码 `KR` 误匹配，并为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立“容器镜像”测速组，自动选择真实可用的机场节点，不使用 `DIRECT`。配置校验或热重载失败时自动恢复。
+该脚本会新增“自动优选”：每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套代理组健康检查超时和重复探测。“节点选择”和“漏网之鱼”会优先使用自动优选，“稳定优选”则独立按地区组故障接管，同时保留手动切换。脚本还会让 X 使用 `pbs.twimg.com` 图片 CDN 做目标站可用性测速、修复短代码 `KR` 误匹配、排除名称含“电信推荐”的节点，并为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立“容器镜像”测速组，自动选择真实可用的机场节点，不使用 `DIRECT`。配置校验或热重载失败时自动恢复。
 
 NAS 的 Docker 守护进程需要配置 Mihomo HTTP 代理，例如 `http://192.168.5.6:7890/`。`NO_PROXY` / “不代理域名”中不得包含：
 
@@ -170,7 +171,7 @@ pkg-containers.githubusercontent.com
 pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-social-speed.sh | bash'
 ```
 
-该脚本会增加“香港高速”和“社交媒体”自动测速组；“社交媒体”使用 `api.x.com` 检查目标站可用性，香港高速组排除名称含专线、住宅、直连、HY2 或 Hysteria 的节点，并为 X、Instagram/Meta 写入专用域名规则和代理加密 DNS 策略，避免国内 DNS 返回错误的 CDN 地址。执行前会备份配置，配置校验或热重载失败时自动恢复。
+该脚本会增加“香港高速”和“社交媒体”自动测速组，并为 X 增加“X媒体”目标站自动测速组与“X视频”视频 CDN 自动测速组；“X媒体”使用 `pbs.twimg.com` 图片 CDN 检查线路，在香港高速、新加坡、日本、台湾、美国五个地区组之间自动选择。“X视频”使用 `video-s.twimg.com/video/` 检查视频线路，在香港高速、新加坡、美国之间自动选择，避免 X 视频被延迟低但实际传输为 `0 B/s` 的节点接管。X 的 API/页面走“X媒体”，图片/视频 CDN 走“X视频”，Instagram/Meta 继续走“社交媒体”，同时使用代理加密 DNS，避免国内 DNS 返回错误的 CDN 地址。执行前会备份配置，配置校验或热重载失败时自动恢复。
 
 仅更新 NexusBox 修补版：
 

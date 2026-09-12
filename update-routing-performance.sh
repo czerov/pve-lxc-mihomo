@@ -12,15 +12,17 @@ TMP_RULES="${CONFIG_FILE}.tmp-routing-rules-${STAMP}"
 TMP_DNS="${CONFIG_FILE}.tmp-routing-dns-${STAMP}"
 
 FILTER_KR_LINE="FilterKR: &FilterKR '^(?=.*(?i)(韩|🇰🇷|韓|首尔|南朝鲜|Korea|South|(^|[^A-Za-z])(KR|KOR)([^A-Za-z]|$))).*$'"
-FILTER_NOISE="(?i)(DIRECT|直连|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author)"
-URL_TEST_ANCHOR_LINE="UrlTest: &UrlTest {type: url-test, proxies: [DIRECT], interval: 300, tolerance: 50, lazy: true, url: 'https://www.gstatic.com/generate_204', disable-udp: false, timeout: 5000, max-failed-times: 2, hidden: true, include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: \"(?i)(直连|direct)\"}"
+FILTER_NOISE="(?i)(DIRECT|直连|电信推荐|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author)"
+URL_TEST_ANCHOR_LINE="UrlTest: &UrlTest {type: url-test, proxies: [DIRECT], interval: 300, tolerance: 50, lazy: true, url: 'https://www.gstatic.com/generate_204', disable-udp: false, timeout: 5000, max-failed-times: 2, hidden: true, include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: \"(?i)(直连|direct|电信推荐)\"}"
 SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 20, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
+X_MEDIA_GROUP_LINE="  - {name: X媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://pbs.twimg.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
+X_VIDEO_GROUP_LINE="  - {name: X视频, type: url-test, proxies: [香港高速, 新加坡节点, 美国节点], url: 'https://video-s.twimg.com/video/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
 CONTAINER_GROUP_LINE="  - {name: 容器镜像, type: url-test, proxies: [自动优选], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: \"$FILTER_NOISE\", url: 'https://pkg-containers.githubusercontent.com/', interval: 300, tolerance: 100, lazy: false, timeout: 10000, max-failed-times: 2, hidden: false}"
 AUTO_GROUP_LINE="  - {name: 自动优选, type: url-test, proxies: [DIRECT], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: \"$FILTER_NOISE\", url: 'https://www.gstatic.com/generate_204', interval: 300, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 2, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}"
-AIRPORT_GROUP_LINE="  - {name: 机场节点, type: select, proxies: [DIRECT], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: \"$FILTER_NOISE\", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Airport.png' }"
+AIRPORT_GROUP_LINE="  - {name: 机场节点, type: select, proxies: [DIRECT], include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: \"(?i)(DIRECT|直连|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author)\", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Airport.png' }"
 SELECT_GROUP_LINE="  - {name: 节点选择, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Filter.png', proxies: [自动优选, 稳定优选, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 省流节点, 高级节点, 手动切换, 全球直连, 机场节点]}"
 CATCH_ALL_GROUP_LINE="  - {name: 漏网之鱼, type: select, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Unlock.png', proxies: [自动优选, 稳定优选, 节点选择, 全球直连, 香港节点, 新加坡节点, 韩国节点, 台湾节点, 日本节点, 美国节点, 省流节点, 高级节点, 手动切换, 机场节点]}"
-FALLBACK_GROUP_LINE="  - {name: 稳定优选, type: fallback, proxies: [自动优选, 香港节点, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}"
+FALLBACK_GROUP_LINE="  - {name: 稳定优选, type: fallback, proxies: [香港高速, 美国节点, 台湾节点, 日本节点, 新加坡节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}"
 
 say() {
   printf '[%s] %s\n' "$(date '+%F %T')" "$*"
@@ -122,6 +124,8 @@ mv "$TMP_DNS" "$CONFIG_FILE"
 awk \
   -v filter_kr="$FILTER_KR_LINE" \
   -v url_test_anchor="$URL_TEST_ANCHOR_LINE" \
+  -v x_media_group="$X_MEDIA_GROUP_LINE" \
+  -v x_video_group="$X_VIDEO_GROUP_LINE" \
   -v social_group="$SOCIAL_GROUP_LINE" \
   -v container_group="$CONTAINER_GROUP_LINE" \
   -v auto_group="$AUTO_GROUP_LINE" \
@@ -130,7 +134,7 @@ awk \
   -v catch_all_group="$CATCH_ALL_GROUP_LINE" \
   -v fallback_group="$FALLBACK_GROUP_LINE" '
   BEGIN {
-    filter_written = anchor_written = social_written = container_written = auto_written = 0
+    filter_written = anchor_written = x_media_written = x_video_written = social_written = container_written = auto_written = 0
     select_written = catch_all_written = fallback_written = airport_written = 0
   }
   /^FilterKR:/ {
@@ -145,12 +149,17 @@ awk \
   }
   /^proxy-groups:[[:space:]]*$/ {
     print
+    print x_media_group
+    print x_video_group
+    x_video_written = 1
     print social_group
     print container_group
     print auto_group
-    social_written = container_written = auto_written = 1
+    x_media_written = social_written = container_written = auto_written = 1
     next
   }
+  /^  - \{name: X媒体,/ { next }
+  /^  - \{name: X视频,/ { next }
   /^  - \{name: 社交媒体,/ { next }
   /^  - \{name: 容器镜像,/ { next }
   /^  - \{name: 自动优选,/ { next }
@@ -176,7 +185,7 @@ awk \
   }
   { print }
   END {
-    if (!(filter_written && anchor_written && social_written && container_written && auto_written && select_written && catch_all_written && fallback_written && airport_written)) {
+    if (!(filter_written && anchor_written && x_media_written && x_video_written && social_written && container_written && auto_written && select_written && catch_all_written && fallback_written && airport_written)) {
       exit 42
     }
   }
@@ -185,15 +194,28 @@ awk \
 mv "$TMP_GROUPS" "$CONFIG_FILE"
 
 awk '
+  function print_x_rules() {
+    print "  # X 图片、视频和 API 走独立的全订阅自动测速组"
+    print "  - DOMAIN-SUFFIX,x.com,X媒体"
+    print "  - DOMAIN-SUFFIX,twitter.com,X媒体"
+    print "  - DOMAIN-SUFFIX,twimg.com,X视频"
+    print "  - DOMAIN-SUFFIX,twittercdn.com,X视频"
+    print "  - DOMAIN-SUFFIX,t.co,X媒体"
+    print "  - DOMAIN-SUFFIX,pscp.tv,X视频"
+    print "  - DOMAIN-SUFFIX,periscope.tv,X视频"
+    print "  - DOMAIN-SUFFIX,tweetdeck.com,X媒体"
+  }
   function print_container_rules() {
     print "  # GHCR API 与镜像层使用目标站专用测速组选择代理节点"
     print "  - DOMAIN,ghcr.io,容器镜像"
     print "  - DOMAIN,pkg-containers.githubusercontent.com,容器镜像"
   }
   BEGIN { rules_written = 0 }
-  /^  # GHCR API 与镜像层(使用目标站专项测速|使用目标站专用测速组|优先直连)/ { next }
-  /^  - DOMAIN,(ghcr\.io|pkg-containers\.githubusercontent\.com),容器镜像$/ { next }
+  /^  # X \/ Instagram \/ Meta 使用非 Hysteria2 高速节点$/ { next }
+  /^  # X 图片、视频和 API 走独立的全订阅自动测速组$/ { next }
+  /^  - DOMAIN-SUFFIX,(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com),(X媒体|X视频|社交媒体)$/ { next }
   /^  - RULE-SET,Docker,/ {
+    print_x_rules()
     if (!rules_written) {
       print_container_rules()
       rules_written = 1
@@ -201,6 +223,8 @@ awk '
     print
     next
   }
+  /^  # GHCR API 与镜像层(使用目标站专项测速|使用目标站专用测速组|优先直连)/ { next }
+  /^  - DOMAIN,(ghcr\.io|pkg-containers\.githubusercontent\.com),容器镜像$/ { next }
   { print }
   END {
     if (!rules_written) {
@@ -213,6 +237,8 @@ mv "$TMP_RULES" "$CONFIG_FILE"
 
 has_exact_line "$FILTER_KR_LINE" || fail "韩国节点筛选规则校验失败。"
 has_exact_line "$URL_TEST_ANCHOR_LINE" || fail "地区测速锚点校验失败。"
+has_exact_line "$X_MEDIA_GROUP_LINE" || fail "X 媒体分组校验失败。"
+has_exact_line "$X_VIDEO_GROUP_LINE" || fail "X 视频分组校验失败。"
 has_exact_line "$SOCIAL_GROUP_LINE" || fail "社交媒体分组校验失败。"
 has_exact_line "$CONTAINER_GROUP_LINE" || fail "容器镜像分组校验失败。"
 has_exact_line "$AUTO_GROUP_LINE" || fail "自动优选分组校验失败。"
@@ -247,5 +273,5 @@ else
 fi
 
 trap - ERR
-say "更新完成：已启用跨订阅单层自动优选，并修复韩国节点误匹配、社交应用 DNS 污染和 GHCR 专用节点测速分流。"
+say "更新完成：已启用跨订阅单层自动优选，并让稳定优选直接按地区组故障接管；同时修复韩国节点误匹配、社交应用 DNS 污染和 GHCR 专用节点测速分流。"
 say "备份保留在：$BACKUP"

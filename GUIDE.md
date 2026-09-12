@@ -188,7 +188,7 @@ ROUTING_MODE=gateway bash <(curl -fsSL https://gh-proxy.com/https://raw.githubus
 curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-social-speed.sh | bash
 ```
 
-脚本会让 X、Instagram/Meta 使用“社交媒体”组，其中 X 使用 `api.x.com` 而不是 Google 测速页检查节点可用性；同时为社交域名启用代理加密 DNS，避免国内 DNS 返回错误的 CDN 地址。YouTube 和 Google 使用各自目标站测速，并新增排除专线、住宅、直连、HY2/Hysteria 名称的“香港高速”组。更新后完全关闭相关 App 再重新打开。
+脚本会为 X 建立独立的“X媒体”目标站自动测速组和“X视频”视频 CDN 自动测速组；“X媒体”使用 `pbs.twimg.com` 图片 CDN 检查 API/页面线路，并在香港高速、新加坡、日本、台湾、美国五个地区组之间自动选择；“X视频”使用 `video-s.twimg.com/video/` 检查视频线路，在香港高速、新加坡、美国之间自动选择，避开当前视频为 `0 B/s` 的日本路径。香港高速组排除专线、住宅、直连、电信推荐、HY2/Hysteria 名称的节点。X 的 API/页面走“X媒体”，图片/视频域名走“X视频”，Instagram/Meta 继续使用“社交媒体”组，同时为社交域名启用代理加密 DNS，避免国内 DNS 返回错误的 CDN 地址。更新后完全关闭相关 App 再重新打开。
 
 如果 GHCR/飞牛 Docker 构建同时很慢，或韩国节点组出现实际属于其他国家的节点，执行综合修复：
 
@@ -196,7 +196,7 @@ curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc
 curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-routing-performance.sh | bash
 ```
 
-该脚本还会修复 `KR` 短代码误匹配，为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立“容器镜像”测速组，自动选择真实可用的机场节点且不使用 `DIRECT`，同时新增跨订阅“自动优选”。它每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套组超时和重复探测；日常使用无需在 200 多个机场节点间手动切换。
+该脚本还会修复 `KR` 短代码误匹配，排除名称含“电信推荐”的节点，为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立“容器镜像”测速组，自动选择真实可用的机场节点且不使用 `DIRECT`，同时新增跨订阅“自动优选”。它每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套组超时和重复探测；日常使用无需在 200 多个机场节点间手动切换。
 
 NAS 的 Docker 守护进程需要配置 Mihomo HTTP 代理，例如 `http://192.168.5.6:7890/`。`NO_PROXY` / “不代理域名”中不得包含：
 

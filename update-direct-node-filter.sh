@@ -6,13 +6,13 @@ CONFIG_DIR="$(dirname "$CONFIG_FILE")"
 MIHOMO_BIN="${MIHOMO_BIN:-/opt/mihomo/mihomo}"
 CORE_SOCKET="${CORE_SOCKET:-/opt/nexusbox/var/core.sock}"
 DRY_RUN="${DRY_RUN:-0}"
-FILTER='exclude-filter: "(?i)(直连|direct)"'
+FILTER='exclude-filter: "(?i)(直连|direct|电信推荐)"'
 STABLE_PROXY_NAME='稳定优选'
-URLTEST_LINE='UrlTest: &UrlTest {type: url-test, proxies: [DIRECT], interval: 300, tolerance: 50, lazy: false, url: '\''https://www.gstatic.com/generate_204'\'', disable-udp: false, timeout: 5000, max-failed-times: 2, hidden: true, include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: "(?i)(直连|direct)"}'
-STABLE_GROUP_LINE="  - {name: 稳定优选, type: fallback, proxies: [香港节点, 美国节点, 台湾节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}"
+URLTEST_LINE='UrlTest: &UrlTest {type: url-test, proxies: [DIRECT], interval: 300, tolerance: 50, lazy: false, url: '\''https://www.gstatic.com/generate_204'\'', disable-udp: false, timeout: 5000, max-failed-times: 2, hidden: true, include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: "(?i)(直连|direct|电信推荐)"}'
+STABLE_GROUP_LINE="  - {name: 稳定优选, type: fallback, proxies: [香港高速, 美国节点, 台湾节点, 日本节点, 新加坡节点], url: 'https://www.gstatic.com/generate_204', interval: 60, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Auto.png'}"
 GOOGLE_GROUP_LINE="  - {name: 谷歌服务, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.google.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png'}"
 YOUTUBE_GROUP_LINE="  - {name: YouTube, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.youtube.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png'}"
-HK_FAST_GROUP_LINE="  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: \"(?i)(直连|direct|专线|住宅|hy2|hysteria)\", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png'}"
+HK_FAST_GROUP_LINE="  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: \"(?i)(直连|direct|电信推荐|专线|住宅|hy2|hysteria)\", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png'}"
 CHROME_RULE_MARKER='- DOMAIN,chromewebstore.google.com,美国节点'
 BACKUP="${CONFIG_FILE}.bak-$(date +%Y%m%d-%H%M%S)"
 
@@ -148,7 +148,7 @@ ensure_routing_groups() {
 
   cp -f "$temp_file" "$CONFIG_FILE"
   rm -f "$temp_file"
-  say "已建立香港优先、美国和台湾依次备用的稳定优选分组。"
+say "已建立不嵌套自动优选的稳定分组，按香港高速、美国、台湾、日本、新加坡依次故障接管。"
 }
 
 ensure_chrome_store_rules() {
@@ -298,9 +298,9 @@ if ! select_stable_proxies; then
   die "无法确认主要代理组已切换为稳定优选，已恢复原配置。"
 fi
 
-say "更新完成：区域节点每 5 分钟测速，并排除名称含“直连/direct”的节点。"
+say "更新完成：区域节点每 5 分钟测速，并排除名称含“直连/direct/电信推荐”的节点。"
 say "YouTube 和 Google 已使用香港高速、新加坡、日本、台湾、美国跨地区测速。"
-say "香港高速组已排除专线、住宅、直连、HY2 和 Hysteria 名称的节点。"
+say "香港高速组已排除专线、住宅、直连、电信推荐、HY2 和 Hysteria 名称的节点。"
 say "Chrome Web Store 已固定使用美国节点。"
 if [ "$DRY_RUN" = "1" ]; then
   say "DRY_RUN=1，运行中的代理组未执行切换。"
