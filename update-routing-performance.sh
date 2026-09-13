@@ -11,8 +11,11 @@ TMP_GROUPS="${CONFIG_FILE}.tmp-routing-groups-${STAMP}"
 TMP_RULES="${CONFIG_FILE}.tmp-routing-rules-${STAMP}"
 TMP_DNS="${CONFIG_FILE}.tmp-routing-dns-${STAMP}"
 TMP_WATCHDOG_INSTALLER="${CONFIG_FILE}.tmp-watchdog-installer-${STAMP}"
+TMP_SOCIAL_WATCHDOG_INSTALLER="${CONFIG_FILE}.tmp-social-watchdog-installer-${STAMP}"
 WATCHDOG_INSTALL="${WATCHDOG_INSTALL:-1}"
 WATCHDOG_INSTALLER_URL="${WATCHDOG_INSTALLER_URL:-}"
+SOCIAL_WATCHDOG_INSTALL="${SOCIAL_WATCHDOG_INSTALL:-1}"
+SOCIAL_WATCHDOG_INSTALLER_URL="${SOCIAL_WATCHDOG_INSTALLER_URL:-}"
 PROJECT_REPO="${PROJECT_REPO:-czerov/pve-lxc-mihomo}"
 PROJECT_REF="${PROJECT_REF:-main}"
 
@@ -49,6 +52,7 @@ cleanup_temp() {
   [ ! -e "$TMP_RULES" ] || rm -f "$TMP_RULES"
   [ ! -e "$TMP_DNS" ] || rm -f "$TMP_DNS"
   [ ! -e "$TMP_WATCHDOG_INSTALLER" ] || rm -f "$TMP_WATCHDOG_INSTALLER"
+  [ ! -e "$TMP_SOCIAL_WATCHDOG_INSTALLER" ] || rm -f "$TMP_SOCIAL_WATCHDOG_INSTALLER"
 }
 
 install_container_watchdog() {
@@ -85,6 +89,42 @@ install_container_watchdog() {
     return 0
   fi
   say "容器镜像低速/停滞自动切换服务已启用。"
+}
+
+install_social_watchdog() {
+  local raw url downloaded=0
+  local -a urls=()
+
+  case "$SOCIAL_WATCHDOG_INSTALL" in
+    1|true|yes|on) ;;
+    *) say "已跳过社交媒体守护服务安装。"; return 0 ;;
+  esac
+  [ "$DRY_RUN" != "1" ] || return 0
+
+  raw="https://raw.githubusercontent.com/${PROJECT_REPO}/${PROJECT_REF}/install-social-media-watchdog.sh"
+  [ -z "$SOCIAL_WATCHDOG_INSTALLER_URL" ] || urls+=("$SOCIAL_WATCHDOG_INSTALLER_URL")
+  urls+=(
+    "https://gh-proxy.com/${raw}"
+    "https://gh.llkk.cc/${raw}"
+    "https://cdn.jsdelivr.net/gh/${PROJECT_REPO}@${PROJECT_REF}/install-social-media-watchdog.sh"
+    "$raw"
+  )
+  for url in "${urls[@]}"; do
+    say "尝试下载社交媒体守护服务安装器：$url"
+    if curl -fL --connect-timeout 10 --max-time 60 --retry 1 -o "$TMP_SOCIAL_WATCHDOG_INSTALLER" "$url" && [ -s "$TMP_SOCIAL_WATCHDOG_INSTALLER" ]; then
+      downloaded=1
+      break
+    fi
+  done
+  if [ "$downloaded" != "1" ]; then
+    say "警告：社交媒体守护服务安装器下载失败，分流配置已生效，可稍后单独安装。"
+    return 0
+  fi
+  if ! bash "$TMP_SOCIAL_WATCHDOG_INSTALLER"; then
+    say "警告：社交媒体守护服务安装失败，分流配置已生效，可稍后单独安装。"
+    return 0
+  fi
+  say "X/Instagram 媒体低速/停滞自动切换服务已启用。"
 }
 
 reload_config() {
@@ -312,10 +352,11 @@ if [ "$DRY_RUN" != "1" ]; then
   curl -fsS --unix-socket "$CORE_SOCKET" -X DELETE \
     'http://localhost/connections' >/dev/null
   install_container_watchdog
+  install_social_watchdog
 else
   say "DRY_RUN=1，已完成文件修改与结构校验，跳过内核验证和热重载。"
 fi
 
 trap - ERR
-say "更新完成：已启用跨订阅单层自动优选，并让稳定优选直接按地区组故障接管；同时修复韩国节点误匹配、社交应用 DNS 污染，并让 GHCR 专用组自动切换低速或停滞线路。"
+say "更新完成：已启用跨订阅单层自动优选，并让稳定优选直接按地区组故障接管；同时修复韩国节点误匹配、社交应用 DNS 污染，并让 GHCR 与 X/Instagram 媒体连接自动切换低速或停滞线路。"
 say "备份保留在：$BACKUP"

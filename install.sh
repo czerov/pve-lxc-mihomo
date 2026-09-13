@@ -42,6 +42,8 @@ GEODATA_MIN_BYTES="${GEODATA_MIN_BYTES:-1048576}"
 ZASHBOARD_URL="${ZASHBOARD_URL:-https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip}"
 CONTAINER_WATCHDOG_ENABLE="${CONTAINER_WATCHDOG_ENABLE:-1}"
 CONTAINER_WATCHDOG_INSTALLER_URL="${CONTAINER_WATCHDOG_INSTALLER_URL:-}"
+SOCIAL_WATCHDOG_ENABLE="${SOCIAL_WATCHDOG_ENABLE:-1}"
+SOCIAL_WATCHDOG_INSTALLER_URL="${SOCIAL_WATCHDOG_INSTALLER_URL:-}"
 
 mkdir -p "$WORK_DIR"
 exec > >(tee -a "$LOG") 2>&1
@@ -1555,6 +1557,51 @@ install_container_image_watchdog() {
   say "容器镜像低速/停滞自动切换服务已启用。"
 }
 
+install_social_media_watchdog() {
+  local runtime_config raw installer url downloaded=0
+  local -a urls=()
+
+  case "$SOCIAL_WATCHDOG_ENABLE" in
+    1|true|yes|on) ;;
+    *) say "已跳过社交媒体守护服务安装。"; return 0 ;;
+  esac
+  if [ "$INSTALL_PROFILE" = "nexusbox" ]; then
+    runtime_config="${NEXUSBOX_CONFIG_DIR}/config.yaml"
+  else
+    runtime_config="$CONFIG_FILE"
+  fi
+  if ! grep -q '^  - {name: X视频,' "$runtime_config" || ! grep -q '^  - {name: 社交媒体,' "$runtime_config"; then
+    say "当前配置没有 X视频/社交媒体分组，跳过社交媒体守护服务安装。"
+    return 0
+  fi
+
+  installer="$WORK_DIR/install-social-media-watchdog.sh"
+  raw="https://raw.githubusercontent.com/${NEXUSBOX_PATCHED_REPO}/${NEXUSBOX_PATCHED_BRANCH}/install-social-media-watchdog.sh"
+  [ -z "$SOCIAL_WATCHDOG_INSTALLER_URL" ] || urls+=("$SOCIAL_WATCHDOG_INSTALLER_URL")
+  urls+=(
+    "https://gh-proxy.com/${raw}"
+    "https://gh.llkk.cc/${raw}"
+    "https://cdn.jsdelivr.net/gh/${NEXUSBOX_PATCHED_REPO}@${NEXUSBOX_PATCHED_BRANCH}/install-social-media-watchdog.sh"
+    "$raw"
+  )
+  for url in "${urls[@]}"; do
+    say "尝试下载社交媒体守护服务安装器：$url"
+    if fetch_url "$url" "$installer" && [ -s "$installer" ]; then
+      downloaded=1
+      break
+    fi
+  done
+  if [ "$downloaded" != "1" ]; then
+    say "警告：社交媒体守护服务安装器下载失败，核心安装不受影响。"
+    return 0
+  fi
+  if ! bash "$installer"; then
+    say "警告：社交媒体守护服务安装失败，核心安装不受影响。"
+    return 0
+  fi
+  say "X/Instagram 媒体低速/停滞自动切换服务已启用。"
+}
+
 print_report() {
   local report_config tun_stack
   if [ "$INSTALL_PROFILE" = "nexusbox" ]; then
@@ -1619,6 +1666,7 @@ main() {
   esac
 
   install_container_image_watchdog
+  install_social_media_watchdog
   print_report
   say "全部完成"
 }

@@ -10,6 +10,11 @@ BACKUP="${CONFIG_FILE}.bak-social-speed-${STAMP}"
 TMP_GROUPS="${CONFIG_FILE}.tmp-social-groups-${STAMP}"
 TMP_RULES="${CONFIG_FILE}.tmp-social-rules-${STAMP}"
 TMP_DNS="${CONFIG_FILE}.tmp-social-dns-${STAMP}"
+TMP_WATCHDOG_INSTALLER="${CONFIG_FILE}.tmp-social-watchdog-installer-${STAMP}"
+WATCHDOG_INSTALL="${WATCHDOG_INSTALL:-1}"
+WATCHDOG_INSTALLER_URL="${WATCHDOG_INSTALLER_URL:-}"
+PROJECT_REPO="${PROJECT_REPO:-czerov/pve-lxc-mihomo}"
+PROJECT_REF="${PROJECT_REF:-main}"
 
 X_MEDIA_GROUP_LINE="  - {name: X媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://pbs.twimg.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
 X_VIDEO_GROUP_LINE="  - {name: X视频, type: url-test, proxies: [香港高速, 新加坡节点, 美国节点], url: 'https://video-s.twimg.com/video/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
@@ -26,6 +31,43 @@ cleanup_temp() {
   [ ! -e "$TMP_GROUPS" ] || rm -f "$TMP_GROUPS"
   [ ! -e "$TMP_RULES" ] || rm -f "$TMP_RULES"
   [ ! -e "$TMP_DNS" ] || rm -f "$TMP_DNS"
+  [ ! -e "$TMP_WATCHDOG_INSTALLER" ] || rm -f "$TMP_WATCHDOG_INSTALLER"
+}
+
+install_social_watchdog() {
+  local raw url downloaded=0
+  local -a urls=()
+
+  case "$WATCHDOG_INSTALL" in
+    1|true|yes|on) ;;
+    *) say "已跳过社交媒体守护服务安装。"; return 0 ;;
+  esac
+  [ "$DRY_RUN" != "1" ] || return 0
+
+  raw="https://raw.githubusercontent.com/${PROJECT_REPO}/${PROJECT_REF}/install-social-media-watchdog.sh"
+  [ -z "$WATCHDOG_INSTALLER_URL" ] || urls+=("$WATCHDOG_INSTALLER_URL")
+  urls+=(
+    "https://gh-proxy.com/${raw}"
+    "https://gh.llkk.cc/${raw}"
+    "https://cdn.jsdelivr.net/gh/${PROJECT_REPO}@${PROJECT_REF}/install-social-media-watchdog.sh"
+    "$raw"
+  )
+  for url in "${urls[@]}"; do
+    say "尝试下载社交媒体守护服务安装器：$url"
+    if curl -fL --connect-timeout 10 --max-time 60 --retry 1 -o "$TMP_WATCHDOG_INSTALLER" "$url" && [ -s "$TMP_WATCHDOG_INSTALLER" ]; then
+      downloaded=1
+      break
+    fi
+  done
+  if [ "$downloaded" != "1" ]; then
+    say "警告：社交媒体守护服务安装器下载失败，分流配置已生效，可稍后单独安装。"
+    return 0
+  fi
+  if ! bash "$TMP_WATCHDOG_INSTALLER"; then
+    say "警告：社交媒体守护服务安装失败，分流配置已生效，可稍后单独安装。"
+    return 0
+  fi
+  say "X/Instagram 媒体低速/停滞自动切换服务已启用。"
 }
 
 reload_config() {
@@ -248,12 +290,14 @@ if [ "$DRY_RUN" != "1" ]; then
     'http://localhost/cache/fakeip/flush' >/dev/null
   curl -fsS --unix-socket "$CORE_SOCKET" -X DELETE \
     'http://localhost/connections' >/dev/null
+  install_social_watchdog
 else
   say "DRY_RUN=1，已完成文件修改与结构校验，跳过内核验证和热重载。"
 fi
 
 trap - ERR
 say "更新完成：X 已使用独立目标站自动测速组，Instagram、YouTube、Google 已使用自动测速组。"
+say "X/Instagram 媒体连接已启用实际低速和首次无下载自动切换。"
 say "X、Instagram、Meta 域名已强制通过代理加密 DNS 解析，避免国内 DNS 污染。"
 say "香港高速组已排除名称含专线、住宅、直连、电信推荐、HY2 或 Hysteria 的节点。"
 say "备份保留在：$BACKUP"

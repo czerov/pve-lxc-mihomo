@@ -190,6 +190,16 @@ curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc
 
 脚本会为 X 建立独立的“X媒体”目标站自动测速组和“X视频”视频 CDN 自动测速组；“X媒体”使用 `pbs.twimg.com` 图片 CDN 检查 API/页面线路，并在香港高速、新加坡、日本、台湾、美国五个地区组之间自动选择；“X视频”使用 `video-s.twimg.com/video/` 检查视频线路，在香港高速、新加坡、美国之间自动选择，避开当前视频为 `0 B/s` 的日本路径。香港高速组排除专线、住宅、直连、电信推荐、HY2/Hysteria 名称的节点。X 的 API/页面走“X媒体”，图片/视频域名走“X视频”，Instagram/Meta 继续使用“社交媒体”组，同时为社交域名启用代理加密 DNS，避免国内 DNS 返回错误的 CDN 地址。更新后完全关闭相关 App 再重新打开。
 
+更新脚本同时安装社交媒体连接守护服务。它只观察 X/Instagram/Meta 的媒体 CDN：新连接连续 15 秒没有收到数据、X 视频开始传输后连续 25 秒不再增长，或媒体连接连续 20 秒低于 64 KiB/s 时，优先换到另一订阅的健康地区组并关闭这条卡住的连接；登录、消息和普通 API 不会被中断。若分组已经由定时测速切换，守护服务只关闭仍停留在旧线路的连接。每 10 分钟最多处理 3 次。
+
+单独安装、查看状态和观察实时日志：
+
+```bash
+curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install-social-media-watchdog.sh | bash
+systemctl status mihomo-social-media-watchdog --no-pager
+journalctl -u mihomo-social-media-watchdog -f
+```
+
 如果 GHCR/飞牛 Docker 构建同时很慢，或韩国节点组出现实际属于其他国家的节点，执行综合修复：
 
 ```bash

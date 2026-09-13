@@ -188,6 +188,21 @@ pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https:
 
 该脚本会增加“香港高速”和“社交媒体”自动测速组，并为 X 增加“X媒体”目标站自动测速组与“X视频”视频 CDN 自动测速组；“X媒体”使用 `pbs.twimg.com` 图片 CDN 检查线路，在香港高速、新加坡、日本、台湾、美国五个地区组之间自动选择。“X视频”使用 `video-s.twimg.com/video/` 检查视频线路，在香港高速、新加坡、美国之间自动选择，避免 X 视频被延迟低但实际传输为 `0 B/s` 的节点接管。X 的 API/页面走“X媒体”，图片/视频 CDN 走“X视频”，Instagram/Meta 继续走“社交媒体”，同时使用代理加密 DNS，避免国内 DNS 返回错误的 CDN 地址。执行前会备份配置，配置校验或热重载失败时自动恢复。
 
+更新脚本还会安装社交媒体连接守护服务。它只监控 X/Instagram/Meta 的媒体 CDN，不干预登录、消息或普通 API；新媒体连接连续 15 秒没有收到数据、X 视频开始传输后连续 25 秒不再增长，或媒体连接连续 20 秒低于 64 KiB/s 时，优先切换到当前节点不同订阅的健康地区组，并只关闭卡住的媒体连接。若目标组已经自动换线，则只关闭仍停留在旧线路的连接。默认每 10 分钟最多处理 3 次，避免 App 频繁断流。
+
+单独安装或修复社交媒体守护服务：
+
+```bash
+pct exec 109 -- bash -c 'curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install-social-media-watchdog.sh | bash'
+```
+
+查看状态和实时切换日志：
+
+```bash
+pct exec 109 -- systemctl status mihomo-social-media-watchdog --no-pager
+pct exec 109 -- journalctl -u mihomo-social-media-watchdog -f
+```
+
 仅更新 NexusBox 修补版：
 
 ```bash
