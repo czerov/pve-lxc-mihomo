@@ -154,7 +154,7 @@ pct exec <CTID> -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/htt
 pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-routing-performance.sh | bash'
 ```
 
-该脚本会新增“自动优选”：每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套代理组健康检查超时和重复探测。“节点选择”和“漏网之鱼”会优先使用自动优选，“稳定优选”则独立按地区组故障接管，同时保留手动切换。脚本还会让 X 使用 `pbs.twimg.com` 图片 CDN 做目标站可用性测速、修复短代码 `KR` 误匹配、排除名称含“电信推荐”的节点，并为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立“容器镜像”测速组，自动选择真实可用的机场节点，不使用 `DIRECT`。配置校验或热重载失败时自动恢复。
+该脚本会新增“自动优选”：每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套代理组健康检查超时和重复探测。“节点选择”和“漏网之鱼”会优先使用自动优选，“稳定优选”则独立按地区组故障接管，同时保留手动切换。脚本还会让 X 使用 `pbs.twimg.com` 图片 CDN 做目标站可用性测速、修复短代码 `KR` 误匹配、排除名称含“电信推荐”的节点，并为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立“容器镜像”测速组。容器镜像组直接在真实节点中进行单层测速，不使用 `DIRECT` 或嵌套的“自动优选”，还会排除专线、住宅、HY2/Hysteria2 等容易出现低延迟但低吞吐的线路，每分钟重新检测并以 20ms 容差快速切换。配置校验或热重载失败时自动恢复。
 
 NAS 的 Docker 守护进程需要配置 Mihomo HTTP 代理，例如 `http://192.168.5.6:7890/`。`NO_PROXY` / “不代理域名”中不得包含：
 

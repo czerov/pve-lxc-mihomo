@@ -196,7 +196,7 @@ curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc
 curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-routing-performance.sh | bash
 ```
 
-该脚本还会修复 `KR` 短代码误匹配，排除名称含“电信推荐”的节点，为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立“容器镜像”测速组，自动选择真实可用的机场节点且不使用 `DIRECT`，同时新增跨订阅“自动优选”。它每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套组超时和重复探测；日常使用无需在 200 多个机场节点间手动切换。
+该脚本还会修复 `KR` 短代码误匹配，排除名称含“电信推荐”的节点，为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立“容器镜像”测速组，直接在真实节点中进行单层测速，不使用 `DIRECT` 或嵌套的“自动优选”。容器镜像组会额外排除专线、住宅、HY2/Hysteria2 等容易出现低延迟但低吞吐的线路，每分钟重新检测并以 20ms 容差快速切换。同时新增跨订阅“自动优选”，它每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套组超时和重复探测；日常使用无需在 200 多个机场节点间手动切换。
 
 NAS 的 Docker 守护进程需要配置 Mihomo HTTP 代理，例如 `http://192.168.5.6:7890/`。`NO_PROXY` / “不代理域名”中不得包含：
 
