@@ -37,8 +37,23 @@ command -v systemctl >/dev/null 2>&1 || die "系统不支持 systemd。"
 command -v curl >/dev/null 2>&1 || die "缺少 curl。"
 command -v jq >/dev/null 2>&1 || {
   say "正在安装结构化 JSON 解析依赖 jq"
-  apt-get update
-  apt-get install -y jq
+  direct_apt=(
+    -o Acquire::http::Proxy=false
+    -o Acquire::https::Proxy=false
+    -o Acquire::Retries=2
+  )
+  local_proxy_apt=(
+    -o Acquire::http::Proxy=http://127.0.0.1:7890
+    -o Acquire::https::Proxy=http://127.0.0.1:7890
+    -o Acquire::Retries=2
+  )
+  if apt-get "${direct_apt[@]}" update && apt-get "${direct_apt[@]}" install -y jq; then
+    say "已绕过旧 APT 代理并安装 jq。"
+  else
+    say "APT 直连失败，改用 LXC 本机 Mihomo 代理 127.0.0.1:7890。"
+    apt-get "${local_proxy_apt[@]}" update
+    apt-get "${local_proxy_apt[@]}" install -y jq
+  fi
 }
 
 raw="https://raw.githubusercontent.com/${REPO}/${REF}/container-image-watchdog.sh"

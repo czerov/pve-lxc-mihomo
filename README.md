@@ -171,6 +171,8 @@ pkg-containers.githubusercontent.com
 pct exec 109 -- bash -c 'curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install-container-image-watchdog.sh | bash'
 ```
 
+安装器会忽略 `/etc/apt/apt.conf.d/` 中已经失效的旧 PC 代理并先尝试 APT 直连；直连不可用时自动改用 LXC 本机的 `127.0.0.1:7890`。
+
 查看状态和实时切换日志：
 
 ```bash
