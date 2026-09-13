@@ -10,6 +10,11 @@ BACKUP="${CONFIG_FILE}.bak-routing-performance-${STAMP}"
 TMP_GROUPS="${CONFIG_FILE}.tmp-routing-groups-${STAMP}"
 TMP_RULES="${CONFIG_FILE}.tmp-routing-rules-${STAMP}"
 TMP_DNS="${CONFIG_FILE}.tmp-routing-dns-${STAMP}"
+TMP_WATCHDOG_INSTALLER="${CONFIG_FILE}.tmp-watchdog-installer-${STAMP}"
+WATCHDOG_INSTALL="${WATCHDOG_INSTALL:-1}"
+WATCHDOG_INSTALLER_URL="${WATCHDOG_INSTALLER_URL:-}"
+PROJECT_REPO="${PROJECT_REPO:-czerov/pve-lxc-mihomo}"
+PROJECT_REF="${PROJECT_REF:-main}"
 
 FILTER_KR_LINE="FilterKR: &FilterKR '^(?=.*(?i)(韩|🇰🇷|韓|首尔|南朝鲜|Korea|South|(^|[^A-Za-z])(KR|KOR)([^A-Za-z]|$))).*$'"
 FILTER_NOISE="(?i)(DIRECT|直连|电信推荐|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author)"
@@ -43,6 +48,43 @@ cleanup_temp() {
   [ ! -e "$TMP_GROUPS" ] || rm -f "$TMP_GROUPS"
   [ ! -e "$TMP_RULES" ] || rm -f "$TMP_RULES"
   [ ! -e "$TMP_DNS" ] || rm -f "$TMP_DNS"
+  [ ! -e "$TMP_WATCHDOG_INSTALLER" ] || rm -f "$TMP_WATCHDOG_INSTALLER"
+}
+
+install_container_watchdog() {
+  local raw url downloaded=0
+  local -a urls=()
+
+  case "$WATCHDOG_INSTALL" in
+    1|true|yes|on) ;;
+    *) say "已跳过容器镜像守护服务安装。"; return 0 ;;
+  esac
+  [ "$DRY_RUN" != "1" ] || return 0
+
+  raw="https://raw.githubusercontent.com/${PROJECT_REPO}/${PROJECT_REF}/install-container-image-watchdog.sh"
+  [ -z "$WATCHDOG_INSTALLER_URL" ] || urls+=("$WATCHDOG_INSTALLER_URL")
+  urls+=(
+    "https://gh-proxy.com/${raw}"
+    "https://gh.llkk.cc/${raw}"
+    "https://cdn.jsdelivr.net/gh/${PROJECT_REPO}@${PROJECT_REF}/install-container-image-watchdog.sh"
+    "$raw"
+  )
+  for url in "${urls[@]}"; do
+    say "尝试下载镜像守护服务安装器：$url"
+    if curl -fL --connect-timeout 10 --max-time 60 --retry 1 -o "$TMP_WATCHDOG_INSTALLER" "$url" && [ -s "$TMP_WATCHDOG_INSTALLER" ]; then
+      downloaded=1
+      break
+    fi
+  done
+  if [ "$downloaded" != "1" ]; then
+    say "警告：镜像守护服务安装器下载失败，分流配置已生效，可稍后单独安装。"
+    return 0
+  fi
+  if ! bash "$TMP_WATCHDOG_INSTALLER"; then
+    say "警告：镜像守护服务安装失败，分流配置已生效，可稍后单独安装。"
+    return 0
+  fi
+  say "容器镜像低速/停滞自动切换服务已启用。"
 }
 
 reload_config() {
@@ -269,10 +311,11 @@ if [ "$DRY_RUN" != "1" ]; then
     'http://localhost/cache/fakeip/flush' >/dev/null
   curl -fsS --unix-socket "$CORE_SOCKET" -X DELETE \
     'http://localhost/connections' >/dev/null
+  install_container_watchdog
 else
   say "DRY_RUN=1，已完成文件修改与结构校验，跳过内核验证和热重载。"
 fi
 
 trap - ERR
-say "更新完成：已启用跨订阅单层自动优选，并让稳定优选直接按地区组故障接管；同时修复韩国节点误匹配、社交应用 DNS 污染，并让 GHCR 专用组快速剔除住宅、专线和 Hysteria2 慢速线路。"
+say "更新完成：已启用跨订阅单层自动优选，并让稳定优选直接按地区组故障接管；同时修复韩国节点误匹配、社交应用 DNS 污染，并让 GHCR 专用组自动切换低速或停滞线路。"
 say "备份保留在：$BACKUP"

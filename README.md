@@ -154,7 +154,7 @@ pct exec <CTID> -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/htt
 pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-routing-performance.sh | bash'
 ```
 
-该脚本会新增“自动优选”：每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套代理组健康检查超时和重复探测。“节点选择”和“漏网之鱼”会优先使用自动优选，“稳定优选”则独立按地区组故障接管，同时保留手动切换。脚本还会让 X 使用 `pbs.twimg.com` 图片 CDN 做目标站可用性测速、修复短代码 `KR` 误匹配、排除名称含“电信推荐”的节点，并为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立“容器镜像”测速组。容器镜像组直接在真实节点中进行单层测速，不使用 `DIRECT` 或嵌套的“自动优选”，还会排除专线、住宅、HY2/Hysteria2 等容易出现低延迟但低吞吐的线路，每分钟重新检测并以 20ms 容差快速切换。配置校验或热重载失败时自动恢复。
+该脚本会新增“自动优选”：每 5 分钟直接从全部融合订阅的有效节点中测速选优，地区组改为按需测速，避免嵌套代理组健康检查超时和重复探测。“节点选择”和“漏网之鱼”会优先使用自动优选，“稳定优选”则独立按地区组故障接管，同时保留手动切换。脚本还会让 X 使用 `pbs.twimg.com` 图片 CDN 做目标站可用性测速、修复短代码 `KR` 误匹配、排除名称含“电信推荐”的节点，并为 `ghcr.io` 与 `pkg-containers.githubusercontent.com` 建立独立“容器镜像”测速组。容器镜像组直接在真实节点中进行单层测速，不使用 `DIRECT` 或嵌套的“自动优选”，还会排除专线、住宅、HY2/Hysteria2 等容易出现低延迟但低吞吐的线路。脚本同时安装 systemd 镜像连接守护服务：连续 15 秒没有下载，或连续 30 秒低于 192 KiB/s 时，优先切换到另一订阅的健康节点并只关闭卡住的镜像连接，让 Docker 自动重试；默认每 10 分钟最多切换 3 次，避免反复中断导致 Docker 放弃任务。配置校验或热重载失败时自动恢复。
 
 NAS 的 Docker 守护进程需要配置 Mihomo HTTP 代理，例如 `http://192.168.5.6:7890/`。`NO_PROXY` / “不代理域名”中不得包含：
 
@@ -164,6 +164,19 @@ pkg-containers.githubusercontent.com
 ```
 
 飞牛 fnOS 的位置是“Docker -> 镜像仓库 -> 设置 -> 代理设置”。从“不代理域名”移除以上两项，保存并重启 Docker 后，GHCR API 与镜像层流量才会进入 `7890`，再由“容器镜像”组按目标站测速结果自动选择机场节点。
+
+单独安装或修复镜像连接守护服务：
+
+```bash
+pct exec 109 -- bash -c 'curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install-container-image-watchdog.sh | bash'
+```
+
+查看状态和实时切换日志：
+
+```bash
+pct exec 109 -- systemctl status mihomo-container-image-watchdog --no-pager
+pct exec 109 -- journalctl -u mihomo-container-image-watchdog -f
+```
 
 更新 X、Instagram、YouTube、Google 高速分流：
 
