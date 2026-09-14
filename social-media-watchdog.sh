@@ -10,9 +10,9 @@ MIN_RATE_KIB="${MIN_RATE_KIB:-64}"
 LOW_RATE_SECONDS="${LOW_RATE_SECONDS:-20}"
 WARMUP_SECONDS="${WARMUP_SECONDS:-8}"
 MIN_SWITCH_INTERVAL="${MIN_SWITCH_INTERVAL:-30}"
-ROUTE_COOLDOWN_SECONDS="${ROUTE_COOLDOWN_SECONDS:-600}"
-MAX_SWITCHES_PER_WINDOW="${MAX_SWITCHES_PER_WINDOW:-3}"
-SWITCH_WINDOW_SECONDS="${SWITCH_WINDOW_SECONDS:-600}"
+ROUTE_COOLDOWN_SECONDS="${ROUTE_COOLDOWN_SECONDS:-1800}"
+MAX_SWITCHES_PER_WINDOW="${MAX_SWITCHES_PER_WINDOW:-1}"
+SWITCH_WINDOW_SECONDS="${SWITCH_WINDOW_SECONDS:-900}"
 HOST_REGEX="${HOST_REGEX:-(^|\.)(twimg\.com|twittercdn\.com|pscp\.tv|periscope\.tv|cdninstagram\.com|fbcdn\.net|fbsbx\.com)$}"
 DRY_RUN="${DRY_RUN:-0}"
 RUN_ONCE="${RUN_ONCE:-0}"
@@ -80,7 +80,7 @@ group_for_host() {
       printf '%s\n' 'X视频'
       ;;
     cdninstagram.com|*.cdninstagram.com|fbcdn.net|*.fbcdn.net|fbsbx.com|*.fbsbx.com)
-      printf '%s\n' '社交媒体'
+      printf '%s\n' 'Instagram媒体'
       ;;
     *)
       return 1

@@ -18,7 +18,8 @@ PROJECT_REF="${PROJECT_REF:-main}"
 
 X_MEDIA_GROUP_LINE="  - {name: X媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://pbs.twimg.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
 X_VIDEO_GROUP_LINE="  - {name: X视频, type: url-test, proxies: [香港高速, 新加坡节点, 美国节点], url: 'https://video-s.twimg.com/video/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
-SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 20, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
+SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: select, proxies: [新加坡节点, 香港高速, 美国节点, 日本节点, 台湾节点], hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Instagram.png'}"
+INSTAGRAM_MEDIA_GROUP_LINE="  - {name: Instagram媒体, type: url-test, proxies: [新加坡节点, 香港高速, 美国节点], url: 'https://scontent.cdninstagram.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Instagram.png'}"
 GOOGLE_GROUP_LINE="  - {name: 谷歌服务, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.google.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png'}"
 YOUTUBE_GROUP_LINE="  - {name: YouTube, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://www.youtube.com/generate_204', interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png'}"
 HK_FAST_GROUP_LINE="  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: \"(?i)(直连|direct|电信推荐|专线|住宅|hy2|hysteria)\", icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png'}"
@@ -151,11 +152,12 @@ awk \
   -v x_media_group="$X_MEDIA_GROUP_LINE" \
   -v x_video_group="$X_VIDEO_GROUP_LINE" \
   -v social_group="$SOCIAL_GROUP_LINE" \
+  -v instagram_media_group="$INSTAGRAM_MEDIA_GROUP_LINE" \
   -v google_group="$GOOGLE_GROUP_LINE" \
   -v youtube_group="$YOUTUBE_GROUP_LINE" \
   -v hk_fast_group="$HK_FAST_GROUP_LINE" '
   BEGIN {
-    x_media_written = x_video_written = social_written = google_written = youtube_written = hk_fast_written = 0
+    x_media_written = x_video_written = social_written = instagram_media_written = google_written = youtube_written = hk_fast_written = 0
   }
   /^proxy-groups:[[:space:]]*$/ {
     print
@@ -165,11 +167,14 @@ awk \
     x_media_written = 1
     print social_group
     social_written = 1
+    print instagram_media_group
+    instagram_media_written = 1
     next
   }
   /^  - \{name: X媒体,/ { next }
   /^  - \{name: X视频,/ { next }
   /^  - \{name: 社交媒体,/ { next }
+  /^  - \{name: Instagram媒体,/ { next }
   /^  - \{name: 谷歌服务,/ {
     print google_group
     google_written = 1
@@ -189,7 +194,7 @@ awk \
   }
   { print }
   END {
-    if (!(x_media_written && x_video_written && social_written && google_written && youtube_written && hk_fast_written)) {
+    if (!(x_media_written && x_video_written && social_written && instagram_media_written && google_written && youtube_written && hk_fast_written)) {
       exit 42
     }
   }
@@ -208,13 +213,13 @@ awk '
     print "  - DOMAIN-SUFFIX,pscp.tv,X视频"
     print "  - DOMAIN-SUFFIX,periscope.tv,X视频"
     print "  - DOMAIN-SUFFIX,tweetdeck.com,X媒体"
-    print "  # Instagram / Meta 继续使用跨地区社交媒体组"
+    print "  # Instagram / Meta 账号 API 保持稳定，图片和视频 CDN 独立自动优选"
     print "  - DOMAIN-SUFFIX,instagram.com,社交媒体"
-    print "  - DOMAIN-SUFFIX,cdninstagram.com,社交媒体"
+    print "  - DOMAIN-SUFFIX,cdninstagram.com,Instagram媒体"
     print "  - DOMAIN-SUFFIX,facebook.com,社交媒体"
     print "  - DOMAIN-SUFFIX,facebook.net,社交媒体"
-    print "  - DOMAIN-SUFFIX,fbcdn.net,社交媒体"
-    print "  - DOMAIN-SUFFIX,fbsbx.com,社交媒体"
+    print "  - DOMAIN-SUFFIX,fbcdn.net,Instagram媒体"
+    print "  - DOMAIN-SUFFIX,fbsbx.com,Instagram媒体"
     print "  - DOMAIN-SUFFIX,fb.com,社交媒体"
     print "  - DOMAIN-SUFFIX,fb.me,社交媒体"
     print "  - DOMAIN-SUFFIX,messenger.com,社交媒体"
@@ -226,8 +231,9 @@ awk '
   /^  # X \/ Instagram \/ Meta 使用非 Hysteria2 高速节点$/ { next }
   /^  # X 图片、视频和 API 走独立的全订阅自动测速组$/ { next }
   /^  # Instagram \/ Meta 继续使用跨地区社交媒体组$/ { next }
+  /^  # Instagram \/ Meta 账号 API 保持稳定，图片和视频 CDN 独立自动优选$/ { next }
   /^  - DOMAIN-SUFFIX,(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com|pscp\.tv|periscope\.tv),(X媒体|X视频)$/ { next }
-  /^  - DOMAIN-SUFFIX,(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com|instagram\.com|cdninstagram\.com|facebook\.com|facebook\.net|fbcdn\.net|fbsbx\.com|fb\.com|fb\.me|messenger\.com|meta\.com|threads\.net|oculus\.com),社交媒体$/ { next }
+  /^  - DOMAIN-SUFFIX,(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com|instagram\.com|cdninstagram\.com|facebook\.com|facebook\.net|fbcdn\.net|fbsbx\.com|fb\.com|fb\.me|messenger\.com|meta\.com|threads\.net|oculus\.com),(社交媒体|Instagram媒体)$/ { next }
   /^  - RULE-SET,YouTube,/ {
     if (!rules_written) {
       print_social_rules()
@@ -249,7 +255,8 @@ mv "$TMP_RULES" "$CONFIG_FILE"
 
 grep -Fxq "$X_MEDIA_GROUP_LINE" "$CONFIG_FILE" || fail "X 媒体自动测速组校验失败。"
 grep -Fxq "$X_VIDEO_GROUP_LINE" "$CONFIG_FILE" || fail "X 视频故障接管组校验失败。"
-grep -Fxq "$SOCIAL_GROUP_LINE" "$CONFIG_FILE" || fail "社交媒体自动测速组校验失败。"
+grep -Fxq "$SOCIAL_GROUP_LINE" "$CONFIG_FILE" || fail "社交媒体稳定账号组校验失败。"
+grep -Fxq "$INSTAGRAM_MEDIA_GROUP_LINE" "$CONFIG_FILE" || fail "Instagram 媒体自动测速组校验失败。"
 grep -Fxq "$GOOGLE_GROUP_LINE" "$CONFIG_FILE" || fail "谷歌服务自动测速组校验失败。"
 grep -Fxq "$YOUTUBE_GROUP_LINE" "$CONFIG_FILE" || fail "YouTube 自动测速组校验失败。"
 grep -Fxq "$HK_FAST_GROUP_LINE" "$CONFIG_FILE" || fail "香港高速节点组校验失败。"
@@ -265,6 +272,9 @@ for domain in \
       ;;
     x.com|twitter.com|t.co|tweetdeck.com)
       target_group="X媒体"
+      ;;
+    cdninstagram.com|fbcdn.net|fbsbx.com)
+      target_group="Instagram媒体"
       ;;
   esac
   grep -Fxq "  - DOMAIN-SUFFIX,${domain},${target_group}" "$CONFIG_FILE" ||
@@ -296,7 +306,7 @@ else
 fi
 
 trap - ERR
-say "更新完成：X 已使用独立目标站自动测速组，Instagram、YouTube、Google 已使用自动测速组。"
+say "更新完成：X 已使用独立目标站自动测速组，Instagram 账号与媒体线路已隔离，YouTube、Google 已使用自动测速组。"
 say "X/Instagram 媒体连接已启用实际低速和首次无下载自动切换。"
 say "X、Instagram、Meta 域名已强制通过代理加密 DNS 解析，避免国内 DNS 污染。"
 say "香港高速组已排除名称含专线、住宅、直连、电信推荐、HY2 或 Hysteria 的节点。"

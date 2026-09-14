@@ -100,13 +100,28 @@ LOW_RATE_SECONDS=20
 CHECK_INTERVAL=5
 WARMUP_SECONDS=8
 MIN_SWITCH_INTERVAL=30
-ROUTE_COOLDOWN_SECONDS=600
-MAX_SWITCHES_PER_WINDOW=3
-SWITCH_WINDOW_SECONDS=600
+ROUTE_COOLDOWN_SECONDS=1800
+MAX_SWITCHES_PER_WINDOW=1
+SWITCH_WINDOW_SECONDS=900
 EOF
   chmod 0644 "$ENV_FILE"
 else
   say "保留现有参数：$ENV_FILE"
+  if grep -Fxq 'ROUTE_COOLDOWN_SECONDS=600' "$ENV_FILE"; then
+    sed -i 's/^ROUTE_COOLDOWN_SECONDS=600$/ROUTE_COOLDOWN_SECONDS=1800/' "$ENV_FILE"
+    say "已将旧版地区冷却时间迁移为 1800 秒。"
+  fi
+  if grep -Fxq 'MAX_SWITCHES_PER_WINDOW=3' "$ENV_FILE"; then
+    sed -i 's/^MAX_SWITCHES_PER_WINDOW=3$/MAX_SWITCHES_PER_WINDOW=1/' "$ENV_FILE"
+    say "已将旧版切换上限迁移为每个窗口 1 次。"
+  fi
+  if grep -Fxq 'SWITCH_WINDOW_SECONDS=600' "$ENV_FILE"; then
+    sed -i 's/^SWITCH_WINDOW_SECONDS=600$/SWITCH_WINDOW_SECONDS=900/' "$ENV_FILE"
+    say "已将旧版切换窗口迁移为 900 秒。"
+  fi
+  if ! grep -q '^PROGRESS_STALL_SECONDS=' "$ENV_FILE"; then
+    printf '\n# X 视频已经开始传输但随后完全停住时切换。\nPROGRESS_STALL_SECONDS=25\n' >>"$ENV_FILE"
+  fi
 fi
 
 backup_file "$SERVICE_FILE"
@@ -129,7 +144,8 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now mihomo-social-media-watchdog.service
+systemctl enable mihomo-social-media-watchdog.service
+systemctl restart mihomo-social-media-watchdog.service
 sleep 2
 systemctl is-active --quiet mihomo-social-media-watchdog.service || {
   systemctl status mihomo-social-media-watchdog.service --no-pager || true

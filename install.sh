@@ -1570,8 +1570,8 @@ install_social_media_watchdog() {
   else
     runtime_config="$CONFIG_FILE"
   fi
-  if ! grep -q '^  - {name: X视频,' "$runtime_config" || ! grep -q '^  - {name: 社交媒体,' "$runtime_config"; then
-    say "当前配置没有 X视频/社交媒体分组，跳过社交媒体守护服务安装。"
+  if ! grep -q '^  - {name: X视频,' "$runtime_config" && ! grep -q '^  - {name: Instagram媒体,' "$runtime_config"; then
+    say "当前配置没有 X视频/Instagram媒体分组，跳过社交媒体守护服务安装。"
     return 0
   fi
 

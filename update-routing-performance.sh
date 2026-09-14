@@ -23,7 +23,8 @@ FILTER_KR_LINE="FilterKR: &FilterKR '^(?=.*(?i)(韩|🇰🇷|韓|首尔|南朝�
 FILTER_NOISE="(?i)(DIRECT|直连|电信推荐|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|过滤|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author)"
 FILTER_CONTAINER="${FILTER_NOISE%?}|专线|住宅|hy2|hysteria)"
 URL_TEST_ANCHOR_LINE="UrlTest: &UrlTest {type: url-test, proxies: [DIRECT], interval: 300, tolerance: 50, lazy: true, url: 'https://www.gstatic.com/generate_204', disable-udp: false, timeout: 5000, max-failed-times: 2, hidden: true, include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: \"(?i)(直连|direct|电信推荐)\"}"
-SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://api.x.com/', interval: 60, tolerance: 20, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
+SOCIAL_GROUP_LINE="  - {name: 社交媒体, type: select, proxies: [新加坡节点, 香港高速, 美国节点, 日本节点, 台湾节点], hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Instagram.png'}"
+INSTAGRAM_MEDIA_GROUP_LINE="  - {name: Instagram媒体, type: url-test, proxies: [新加坡节点, 香港高速, 美国节点], url: 'https://scontent.cdninstagram.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Instagram.png'}"
 X_MEDIA_GROUP_LINE="  - {name: X媒体, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: 'https://pbs.twimg.com/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
 X_VIDEO_GROUP_LINE="  - {name: X视频, type: url-test, proxies: [香港高速, 新加坡节点, 美国节点], url: 'https://video-s.twimg.com/video/', interval: 60, tolerance: 50, lazy: false, timeout: 10000, max-failed-times: 1, hidden: false, icon: 'https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Twitter.png'}"
 CONTAINER_GROUP_LINE="  - {name: 容器镜像, type: url-test, include-all: true, include-all-proxies: true, include-all-providers: true, exclude-filter: \"$FILTER_CONTAINER\", exclude-type: \"Hysteria2\", url: 'https://pkg-containers.githubusercontent.com/', interval: 60, tolerance: 20, lazy: false, timeout: 8000, max-failed-times: 1, hidden: false}"
@@ -210,6 +211,7 @@ awk \
   -v x_media_group="$X_MEDIA_GROUP_LINE" \
   -v x_video_group="$X_VIDEO_GROUP_LINE" \
   -v social_group="$SOCIAL_GROUP_LINE" \
+  -v instagram_media_group="$INSTAGRAM_MEDIA_GROUP_LINE" \
   -v container_group="$CONTAINER_GROUP_LINE" \
   -v auto_group="$AUTO_GROUP_LINE" \
   -v airport_group="$AIRPORT_GROUP_LINE" \
@@ -217,7 +219,7 @@ awk \
   -v catch_all_group="$CATCH_ALL_GROUP_LINE" \
   -v fallback_group="$FALLBACK_GROUP_LINE" '
   BEGIN {
-    filter_written = anchor_written = x_media_written = x_video_written = social_written = container_written = auto_written = 0
+    filter_written = anchor_written = x_media_written = x_video_written = social_written = instagram_media_written = container_written = auto_written = 0
     select_written = catch_all_written = fallback_written = airport_written = 0
   }
   /^FilterKR:/ {
@@ -236,14 +238,16 @@ awk \
     print x_video_group
     x_video_written = 1
     print social_group
+    print instagram_media_group
     print container_group
     print auto_group
-    x_media_written = social_written = container_written = auto_written = 1
+    x_media_written = social_written = instagram_media_written = container_written = auto_written = 1
     next
   }
   /^  - \{name: X媒体,/ { next }
   /^  - \{name: X视频,/ { next }
   /^  - \{name: 社交媒体,/ { next }
+  /^  - \{name: Instagram媒体,/ { next }
   /^  - \{name: 容器镜像,/ { next }
   /^  - \{name: 自动优选,/ { next }
   /^  - \{name: 节点选择,/ {
@@ -268,7 +272,7 @@ awk \
   }
   { print }
   END {
-    if (!(filter_written && anchor_written && x_media_written && x_video_written && social_written && container_written && auto_written && select_written && catch_all_written && fallback_written && airport_written)) {
+    if (!(filter_written && anchor_written && x_media_written && x_video_written && social_written && instagram_media_written && container_written && auto_written && select_written && catch_all_written && fallback_written && airport_written)) {
       exit 42
     }
   }
@@ -287,6 +291,19 @@ awk '
     print "  - DOMAIN-SUFFIX,pscp.tv,X视频"
     print "  - DOMAIN-SUFFIX,periscope.tv,X视频"
     print "  - DOMAIN-SUFFIX,tweetdeck.com,X媒体"
+    print "  # Instagram / Meta 账号 API 保持稳定，图片和视频 CDN 独立自动优选"
+    print "  - DOMAIN-SUFFIX,instagram.com,社交媒体"
+    print "  - DOMAIN-SUFFIX,cdninstagram.com,Instagram媒体"
+    print "  - DOMAIN-SUFFIX,facebook.com,社交媒体"
+    print "  - DOMAIN-SUFFIX,facebook.net,社交媒体"
+    print "  - DOMAIN-SUFFIX,fbcdn.net,Instagram媒体"
+    print "  - DOMAIN-SUFFIX,fbsbx.com,Instagram媒体"
+    print "  - DOMAIN-SUFFIX,fb.com,社交媒体"
+    print "  - DOMAIN-SUFFIX,fb.me,社交媒体"
+    print "  - DOMAIN-SUFFIX,messenger.com,社交媒体"
+    print "  - DOMAIN-SUFFIX,meta.com,社交媒体"
+    print "  - DOMAIN-SUFFIX,threads.net,社交媒体"
+    print "  - DOMAIN-SUFFIX,oculus.com,社交媒体"
   }
   function print_container_rules() {
     print "  # GHCR API 与镜像层使用目标站专用测速组选择代理节点"
@@ -296,7 +313,8 @@ awk '
   BEGIN { rules_written = 0 }
   /^  # X \/ Instagram \/ Meta 使用非 Hysteria2 高速节点$/ { next }
   /^  # X 图片、视频和 API 走独立的全订阅自动测速组$/ { next }
-  /^  - DOMAIN-SUFFIX,(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com),(X媒体|X视频|社交媒体)$/ { next }
+  /^  # Instagram \/ Meta (继续使用跨地区社交媒体组|账号 API 保持稳定，图片和视频 CDN 独立自动优选)$/ { next }
+  /^  - DOMAIN-SUFFIX,(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com|instagram\.com|cdninstagram\.com|facebook\.com|facebook\.net|fbcdn\.net|fbsbx\.com|fb\.com|fb\.me|messenger\.com|meta\.com|threads\.net|oculus\.com),(X媒体|X视频|社交媒体|Instagram媒体)$/ { next }
   /^  - RULE-SET,Docker,/ {
     print_x_rules()
     if (!rules_written) {
@@ -322,7 +340,8 @@ has_exact_line "$FILTER_KR_LINE" || fail "韩国节点筛选规则校验失败�
 has_exact_line "$URL_TEST_ANCHOR_LINE" || fail "地区测速锚点校验失败。"
 has_exact_line "$X_MEDIA_GROUP_LINE" || fail "X 媒体分组校验失败。"
 has_exact_line "$X_VIDEO_GROUP_LINE" || fail "X 视频分组校验失败。"
-has_exact_line "$SOCIAL_GROUP_LINE" || fail "社交媒体分组校验失败。"
+has_exact_line "$SOCIAL_GROUP_LINE" || fail "社交媒体稳定账号组校验失败。"
+has_exact_line "$INSTAGRAM_MEDIA_GROUP_LINE" || fail "Instagram 媒体分组校验失败。"
 has_exact_line "$CONTAINER_GROUP_LINE" || fail "容器镜像分组校验失败。"
 has_exact_line "$AUTO_GROUP_LINE" || fail "自动优选分组校验失败。"
 has_exact_line "$AIRPORT_GROUP_LINE" || fail "机场节点分组校验失败。"
@@ -331,6 +350,10 @@ has_exact_line "$CATCH_ALL_GROUP_LINE" || fail "漏网之鱼分组校验失败�
 has_exact_line "$FALLBACK_GROUP_LINE" || fail "稳定优选分组校验失败。"
 has_exact_line '  - DOMAIN,ghcr.io,容器镜像' || fail "ghcr.io 规则校验失败。"
 has_exact_line '  - DOMAIN,pkg-containers.githubusercontent.com,容器镜像' || fail "镜像层规则校验失败。"
+has_exact_line '  - DOMAIN-SUFFIX,instagram.com,社交媒体' || fail "Instagram 账号规则校验失败。"
+has_exact_line '  - DOMAIN-SUFFIX,cdninstagram.com,Instagram媒体' || fail "Instagram CDN 规则校验失败。"
+has_exact_line '  - DOMAIN-SUFFIX,fbcdn.net,Instagram媒体' || fail "Meta CDN 规则校验失败。"
+has_exact_line '  - DOMAIN-SUFFIX,fbsbx.com,Instagram媒体' || fail "Meta 媒体规则校验失败。"
 
 for domain in \
   x.com twitter.com twimg.com twittercdn.com t.co pscp.tv periscope.tv \
@@ -358,5 +381,5 @@ else
 fi
 
 trap - ERR
-say "更新完成：已启用跨订阅单层自动优选，并让稳定优选直接按地区组故障接管；同时修复韩国节点误匹配、社交应用 DNS 污染，并让 GHCR 与 X/Instagram 媒体连接自动切换低速或停滞线路。"
+say "更新完成：已启用跨订阅单层自动优选，并让稳定优选直接按地区组故障接管；同时隔离 Instagram 账号与媒体线路、修复韩国节点误匹配和社交应用 DNS 污染，并让 GHCR 与 X/Instagram 媒体连接自动切换低速或停滞线路。"
 say "备份保留在：$BACKUP"
