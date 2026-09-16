@@ -188,17 +188,9 @@ ROUTING_MODE=gateway bash <(curl -fsSL https://gh-proxy.com/https://raw.githubus
 curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-social-speed.sh | bash
 ```
 
-脚本会为 X 建立独立的“X媒体”目标站自动测速组和“X视频”视频 CDN 自动测速组；“X媒体”使用 `pbs.twimg.com` 图片 CDN 检查 API/页面线路，并在香港高速、新加坡、日本、台湾、美国五个地区组之间自动选择；“X视频”使用 `video-s.twimg.com/video/` 检查视频线路，在香港高速、新加坡、美国之间自动选择，避开当前视频为 `0 B/s` 的日本路径。香港高速组排除专线、住宅、直连、电信推荐、HY2/Hysteria 名称的节点。Instagram/Meta 的账号和普通 API 使用默认固定在新加坡的“社交媒体”稳定账号组，`cdninstagram.com`、`fbcdn.net`、`fbsbx.com` 使用独立“Instagram媒体”组按 CDN 实测选择线路，同时为全部社交域名启用代理加密 DNS，避免国内 DNS 返回错误的 CDN 地址。更新后完全关闭相关 App 再重新打开。
+脚本会为 X 建立独立的“X媒体”目标站自动测速组和“X视频”视频 CDN 自动测速组；页面、API 与 `twimg.com` 静态图片走“X媒体”，`video.twimg.com`、`video-s.twimg.com` 等视频域名走“X视频”。香港高速组排除专线、住宅、直连、电信推荐、HY2/Hysteria 名称的节点。Instagram/Meta 的账号和普通 API 使用默认固定在新加坡的“社交媒体”稳定账号组，`cdninstagram.com`、`fbcdn.net`、`fbsbx.com` 使用独立“Instagram媒体”组按 CDN 实测选择线路，同时为全部社交域名启用代理加密 DNS。更新后完全关闭相关 App 再重新打开。
 
-更新脚本同时安装社交媒体连接守护服务。它只切换“X视频”和“Instagram媒体”：新连接连续 15 秒没有收到数据、X 视频开始传输后连续 25 秒不再增长，或媒体连接连续 20 秒低于 64 KiB/s 时，优先换到另一订阅的健康地区组并关闭这条卡住的连接；登录、消息和普通 API 的账号出口不会改变。若分组已经由定时测速切换，守护服务只关闭仍停留在旧线路的连接。每 15 分钟最多处理 1 次，切走的地区线路冷却 30 分钟。
-
-单独安装、查看状态和观察实时日志：
-
-```bash
-curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install-social-media-watchdog.sh | bash
-systemctl status mihomo-social-media-watchdog --no-pager
-journalctl -u mihomo-social-media-watchdog -f
-```
+更新脚本默认停用旧的社交媒体连接守护服务，并清除 `X视频`、`Instagram媒体` 遗留的 `fixed` 选择，让 Mihomo 原生 `url-test` 按真实 CDN 每 60 秒自动择优。需要保留旧守护行为时，可显式使用 `WATCHDOG_INSTALL=1`。
 
 如果 GHCR/飞牛 Docker 构建同时很慢，或韩国节点组出现实际属于其他国家的节点，执行综合修复：
 

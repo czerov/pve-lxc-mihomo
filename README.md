@@ -108,6 +108,7 @@ ROUTING_MODE=gateway bash <(curl -fsSL https://gh-proxy.com/https://raw.githubus
 | `LXC_PROXY=auto` | 自动探测安装时可用的代理 |
 | `CONFIG_URL=...` | 导入自定义 Mihomo 配置 |
 | `CONFIG_URL=off` | 不导入仓库默认配置 |
+| `SOCIAL_WATCHDOG_ENABLE=1` | 显式启用连接级社交媒体守护；默认关闭 |
 | `INTERACTIVE=0` | 关闭交互菜单 |
 
 示例：
@@ -186,22 +187,9 @@ pct exec 109 -- journalctl -u mihomo-container-image-watchdog -f
 pct exec 109 -- bash -c 'set -o pipefail; curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/update-social-speed.sh | bash'
 ```
 
-该脚本会增加“香港高速”测速组和默认使用新加坡线路的“社交媒体”稳定账号组，并为 X 增加“X媒体”目标站自动测速组与“X视频”视频 CDN 自动测速组；“X媒体”使用 `pbs.twimg.com` 图片 CDN 检查线路，在香港高速、新加坡、日本、台湾、美国五个地区组之间自动选择。“X视频”使用 `video-s.twimg.com/video/` 检查视频线路，在香港高速、新加坡、美国之间自动选择，避免 X 视频被延迟低但实际传输为 `0 B/s` 的节点接管。Instagram/Meta 的账号和普通 API 继续走“社交媒体”，`cdninstagram.com`、`fbcdn.net`、`fbsbx.com` 则进入独立“Instagram媒体”组，通过实际 CDN 测试选择新加坡、香港或美国线路。所有社交域名继续使用代理加密 DNS，避免国内 DNS 返回错误的 CDN 地址。执行前会备份配置，配置校验或热重载失败时自动恢复。
+该脚本会增加“香港高速”测速组和默认使用新加坡线路的“社交媒体”稳定账号组，并为 X 增加“X媒体”目标站自动测速组与“X视频”视频 CDN 自动测速组；页面、API 和 `twimg.com` 静态图片走“X媒体”，只有 `video.twimg.com`、`video-s.twimg.com` 等视频域名走“X视频”。Instagram/Meta 的账号和普通 API 继续走“社交媒体”，`cdninstagram.com`、`fbcdn.net`、`fbsbx.com` 则进入独立“Instagram媒体”组。三个媒体组都使用真实 CDN 每 60 秒自动测速，所有社交域名继续使用代理加密 DNS。执行前会备份配置，配置校验或热重载失败时自动恢复。
 
-更新脚本还会安装社交媒体连接守护服务。它只切换“X视频”和“Instagram媒体”，不改变登录、消息或普通 API 的账号出口；新媒体连接连续 15 秒没有收到数据、X 视频开始传输后连续 25 秒不再增长，或媒体连接连续 20 秒低于 64 KiB/s 时，优先切换到当前节点不同订阅的健康地区组，并只关闭卡住的媒体连接。若目标组已经自动换线，则只关闭仍停留在旧线路的连接。默认每 15 分钟最多处理 1 次，地区线路切走后冷却 30 分钟，降低账号风控和频繁断流风险。
-
-单独安装或修复社交媒体守护服务：
-
-```bash
-pct exec 109 -- bash -c 'curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/czerov/pve-lxc-mihomo/main/install-social-media-watchdog.sh | bash'
-```
-
-查看状态和实时切换日志：
-
-```bash
-pct exec 109 -- systemctl status mihomo-social-media-watchdog --no-pager
-pct exec 109 -- journalctl -u mihomo-social-media-watchdog -f
-```
+更新脚本默认停用旧的社交媒体连接守护服务，并清除它遗留在 `X视频`、`Instagram媒体` 上的 `fixed` 选择，避免线路被长期锁定到高延迟地区。Mihomo 原生 `url-test` 负责持续自动择优。只有明确需要旧的连接级切换行为时才使用 `WATCHDOG_INSTALL=1` 执行更新脚本。
 
 仅更新 NexusBox 修补版：
 

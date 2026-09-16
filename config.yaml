@@ -322,14 +322,16 @@ rules:
   - RULE-SET,Gemini,人工智能
   - RULE-SET,AIDomain,人工智能
   - RULE-SET,AIChat,人工智能
-  # X 图片、视频和 API 走独立的全订阅自动测速组
+  # X 页面、API、静态图片和视频分别使用目标 CDN 自动测速组
   - DOMAIN-SUFFIX,x.com,X媒体
   - DOMAIN-SUFFIX,twitter.com,X媒体
-  - DOMAIN-SUFFIX,twimg.com,X视频
+  - DOMAIN,video.twimg.com,X视频
+  - DOMAIN,video-s.twimg.com,X视频
   - DOMAIN-SUFFIX,twittercdn.com,X视频
-  - DOMAIN-SUFFIX,t.co,X媒体
   - DOMAIN-SUFFIX,pscp.tv,X视频
   - DOMAIN-SUFFIX,periscope.tv,X视频
+  - DOMAIN-SUFFIX,twimg.com,X媒体
+  - DOMAIN-SUFFIX,t.co,X媒体
   - DOMAIN-SUFFIX,tweetdeck.com,X媒体
   # Instagram / Meta 账号 API 保持稳定，图片和视频 CDN 独立自动优选
   - DOMAIN-SUFFIX,instagram.com,社交媒体

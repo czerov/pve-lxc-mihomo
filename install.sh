@@ -42,7 +42,7 @@ GEODATA_MIN_BYTES="${GEODATA_MIN_BYTES:-1048576}"
 ZASHBOARD_URL="${ZASHBOARD_URL:-https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip}"
 CONTAINER_WATCHDOG_ENABLE="${CONTAINER_WATCHDOG_ENABLE:-1}"
 CONTAINER_WATCHDOG_INSTALLER_URL="${CONTAINER_WATCHDOG_INSTALLER_URL:-}"
-SOCIAL_WATCHDOG_ENABLE="${SOCIAL_WATCHDOG_ENABLE:-1}"
+SOCIAL_WATCHDOG_ENABLE="${SOCIAL_WATCHDOG_ENABLE:-0}"
 SOCIAL_WATCHDOG_INSTALLER_URL="${SOCIAL_WATCHDOG_INSTALLER_URL:-}"
 
 mkdir -p "$WORK_DIR"
@@ -1558,12 +1558,24 @@ install_container_image_watchdog() {
 }
 
 install_social_media_watchdog() {
-  local runtime_config raw installer url downloaded=0
+  local runtime_config raw installer url group downloaded=0
   local -a urls=()
 
   case "$SOCIAL_WATCHDOG_ENABLE" in
     1|true|yes|on) ;;
-    *) say "已跳过社交媒体守护服务安装。"; return 0 ;;
+    *)
+      if have systemctl; then
+        systemctl disable --now mihomo-social-media-watchdog.service >/dev/null 2>&1 || true
+      fi
+      if [ -S /opt/nexusbox/var/core.sock ]; then
+        for group in X视频 Instagram媒体; do
+          curl -fsS --unix-socket /opt/nexusbox/var/core.sock -X DELETE \
+            "http://localhost/proxies/${group}" >/dev/null || true
+        done
+      fi
+      say "已停用社交媒体守护服务，媒体分组使用原生 URLTest 自动选择。"
+      return 0
+      ;;
   esac
   if [ "$INSTALL_PROFILE" = "nexusbox" ]; then
     runtime_config="${NEXUSBOX_CONFIG_DIR}/config.yaml"

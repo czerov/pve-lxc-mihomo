@@ -11,7 +11,7 @@ TMP_GROUPS="${CONFIG_FILE}.tmp-social-groups-${STAMP}"
 TMP_RULES="${CONFIG_FILE}.tmp-social-rules-${STAMP}"
 TMP_DNS="${CONFIG_FILE}.tmp-social-dns-${STAMP}"
 TMP_WATCHDOG_INSTALLER="${CONFIG_FILE}.tmp-social-watchdog-installer-${STAMP}"
-WATCHDOG_INSTALL="${WATCHDOG_INSTALL:-1}"
+WATCHDOG_INSTALL="${WATCHDOG_INSTALL:-0}"
 WATCHDOG_INSTALLER_URL="${WATCHDOG_INSTALLER_URL:-}"
 PROJECT_REPO="${PROJECT_REPO:-czerov/pve-lxc-mihomo}"
 PROJECT_REF="${PROJECT_REF:-main}"
@@ -36,12 +36,26 @@ cleanup_temp() {
 }
 
 install_social_watchdog() {
-  local raw url downloaded=0
+  local raw url group downloaded=0
   local -a urls=()
 
   case "$WATCHDOG_INSTALL" in
     1|true|yes|on) ;;
-    *) say "已跳过社交媒体守护服务安装。"; return 0 ;;
+    *)
+      if [ "$DRY_RUN" != "1" ]; then
+        if command -v systemctl >/dev/null 2>&1; then
+          systemctl disable --now mihomo-social-media-watchdog.service >/dev/null 2>&1 || true
+        fi
+        for group in X视频 Instagram媒体; do
+          if ! curl -fsS --unix-socket "$CORE_SOCKET" -X DELETE \
+            "http://localhost/proxies/${group}" >/dev/null; then
+            say "警告：无法清除 ${group} 的 fixed 选择，请在面板中恢复自动选择。"
+          fi
+        done
+      fi
+      say "已停用社交媒体守护服务，并恢复 X/Instagram 原生 URLTest 自动选择。"
+      return 0
+      ;;
   esac
   [ "$DRY_RUN" != "1" ] || return 0
 
@@ -204,14 +218,16 @@ mv "$TMP_GROUPS" "$CONFIG_FILE"
 
 awk '
   function print_social_rules() {
-    print "  # X 图片、视频和 API 走独立的全订阅自动测速组"
+    print "  # X 页面、API、静态图片和视频分别使用目标 CDN 自动测速组"
     print "  - DOMAIN-SUFFIX,x.com,X媒体"
     print "  - DOMAIN-SUFFIX,twitter.com,X媒体"
-    print "  - DOMAIN-SUFFIX,twimg.com,X视频"
+    print "  - DOMAIN,video.twimg.com,X视频"
+    print "  - DOMAIN,video-s.twimg.com,X视频"
     print "  - DOMAIN-SUFFIX,twittercdn.com,X视频"
-    print "  - DOMAIN-SUFFIX,t.co,X媒体"
     print "  - DOMAIN-SUFFIX,pscp.tv,X视频"
     print "  - DOMAIN-SUFFIX,periscope.tv,X视频"
+    print "  - DOMAIN-SUFFIX,twimg.com,X媒体"
+    print "  - DOMAIN-SUFFIX,t.co,X媒体"
     print "  - DOMAIN-SUFFIX,tweetdeck.com,X媒体"
     print "  # Instagram / Meta 账号 API 保持稳定，图片和视频 CDN 独立自动优选"
     print "  - DOMAIN-SUFFIX,instagram.com,社交媒体"
@@ -230,8 +246,10 @@ awk '
   BEGIN { rules_written = youtube_written = 0 }
   /^  # X \/ Instagram \/ Meta 使用非 Hysteria2 高速节点$/ { next }
   /^  # X 图片、视频和 API 走独立的全订阅自动测速组$/ { next }
+  /^  # X 页面、API、静态图片和视频分别使用目标 CDN 自动测速组$/ { next }
   /^  # Instagram \/ Meta 继续使用跨地区社交媒体组$/ { next }
   /^  # Instagram \/ Meta 账号 API 保持稳定，图片和视频 CDN 独立自动优选$/ { next }
+  /^  - DOMAIN,(video\.twimg\.com|video-s\.twimg\.com),X视频$/ { next }
   /^  - DOMAIN-SUFFIX,(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com|pscp\.tv|periscope\.tv),(X媒体|X视频)$/ { next }
   /^  - DOMAIN-SUFFIX,(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com|instagram\.com|cdninstagram\.com|facebook\.com|facebook\.net|fbcdn\.net|fbsbx\.com|fb\.com|fb\.me|messenger\.com|meta\.com|threads\.net|oculus\.com),(社交媒体|Instagram媒体)$/ { next }
   /^  - RULE-SET,YouTube,/ {
@@ -267,10 +285,10 @@ for domain in \
   fbcdn.net fbsbx.com fb.com fb.me messenger.com meta.com threads.net oculus.com; do
   target_group="社交媒体"
   case "$domain" in
-    twimg.com|twittercdn.com|pscp.tv|periscope.tv)
+    twittercdn.com|pscp.tv|periscope.tv)
       target_group="X视频"
       ;;
-    x.com|twitter.com|t.co|tweetdeck.com)
+    x.com|twitter.com|twimg.com|t.co|tweetdeck.com)
       target_group="X媒体"
       ;;
     cdninstagram.com|fbcdn.net|fbsbx.com)
@@ -279,6 +297,11 @@ for domain in \
   esac
   grep -Fxq "  - DOMAIN-SUFFIX,${domain},${target_group}" "$CONFIG_FILE" ||
     fail "${domain} 规则校验失败。"
+done
+
+for domain in video.twimg.com video-s.twimg.com; do
+  grep -Fxq "  - DOMAIN,${domain},X视频" "$CONFIG_FILE" ||
+    fail "${domain} 视频规则校验失败。"
 done
 
 for domain in \
@@ -307,7 +330,7 @@ fi
 
 trap - ERR
 say "更新完成：X 已使用独立目标站自动测速组，Instagram 账号与媒体线路已隔离，YouTube、Google 已使用自动测速组。"
-say "X/Instagram 媒体连接已启用实际低速和首次无下载自动切换。"
+say "X/Instagram 媒体分组使用原生 URLTest 自动选择，旧连接守护服务默认停用。"
 say "X、Instagram、Meta 域名已强制通过代理加密 DNS 解析，避免国内 DNS 污染。"
 say "香港高速组已排除名称含专线、住宅、直连、电信推荐、HY2 或 Hysteria 的节点。"
 say "备份保留在：$BACKUP"

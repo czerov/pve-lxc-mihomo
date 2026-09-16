@@ -14,7 +14,7 @@ TMP_WATCHDOG_INSTALLER="${CONFIG_FILE}.tmp-watchdog-installer-${STAMP}"
 TMP_SOCIAL_WATCHDOG_INSTALLER="${CONFIG_FILE}.tmp-social-watchdog-installer-${STAMP}"
 WATCHDOG_INSTALL="${WATCHDOG_INSTALL:-1}"
 WATCHDOG_INSTALLER_URL="${WATCHDOG_INSTALLER_URL:-}"
-SOCIAL_WATCHDOG_INSTALL="${SOCIAL_WATCHDOG_INSTALL:-1}"
+SOCIAL_WATCHDOG_INSTALL="${SOCIAL_WATCHDOG_INSTALL:-0}"
 SOCIAL_WATCHDOG_INSTALLER_URL="${SOCIAL_WATCHDOG_INSTALLER_URL:-}"
 PROJECT_REPO="${PROJECT_REPO:-czerov/pve-lxc-mihomo}"
 PROJECT_REF="${PROJECT_REF:-main}"
@@ -93,12 +93,26 @@ install_container_watchdog() {
 }
 
 install_social_watchdog() {
-  local raw url downloaded=0
+  local raw url group downloaded=0
   local -a urls=()
 
   case "$SOCIAL_WATCHDOG_INSTALL" in
     1|true|yes|on) ;;
-    *) say "已跳过社交媒体守护服务安装。"; return 0 ;;
+    *)
+      if [ "$DRY_RUN" != "1" ]; then
+        if command -v systemctl >/dev/null 2>&1; then
+          systemctl disable --now mihomo-social-media-watchdog.service >/dev/null 2>&1 || true
+        fi
+        for group in X视频 Instagram媒体; do
+          if ! curl -fsS --unix-socket "$CORE_SOCKET" -X DELETE \
+            "http://localhost/proxies/${group}" >/dev/null; then
+            say "警告：无法清除 ${group} 的 fixed 选择，请在面板中恢复自动选择。"
+          fi
+        done
+      fi
+      say "已停用社交媒体守护服务，并恢复 X/Instagram 原生 URLTest 自动选择。"
+      return 0
+      ;;
   esac
   [ "$DRY_RUN" != "1" ] || return 0
 
@@ -282,14 +296,16 @@ mv "$TMP_GROUPS" "$CONFIG_FILE"
 
 awk '
   function print_x_rules() {
-    print "  # X 图片、视频和 API 走独立的全订阅自动测速组"
+    print "  # X 页面、API、静态图片和视频分别使用目标 CDN 自动测速组"
     print "  - DOMAIN-SUFFIX,x.com,X媒体"
     print "  - DOMAIN-SUFFIX,twitter.com,X媒体"
-    print "  - DOMAIN-SUFFIX,twimg.com,X视频"
+    print "  - DOMAIN,video.twimg.com,X视频"
+    print "  - DOMAIN,video-s.twimg.com,X视频"
     print "  - DOMAIN-SUFFIX,twittercdn.com,X视频"
-    print "  - DOMAIN-SUFFIX,t.co,X媒体"
     print "  - DOMAIN-SUFFIX,pscp.tv,X视频"
     print "  - DOMAIN-SUFFIX,periscope.tv,X视频"
+    print "  - DOMAIN-SUFFIX,twimg.com,X媒体"
+    print "  - DOMAIN-SUFFIX,t.co,X媒体"
     print "  - DOMAIN-SUFFIX,tweetdeck.com,X媒体"
     print "  # Instagram / Meta 账号 API 保持稳定，图片和视频 CDN 独立自动优选"
     print "  - DOMAIN-SUFFIX,instagram.com,社交媒体"
@@ -313,7 +329,9 @@ awk '
   BEGIN { rules_written = 0 }
   /^  # X \/ Instagram \/ Meta 使用非 Hysteria2 高速节点$/ { next }
   /^  # X 图片、视频和 API 走独立的全订阅自动测速组$/ { next }
+  /^  # X 页面、API、静态图片和视频分别使用目标 CDN 自动测速组$/ { next }
   /^  # Instagram \/ Meta (继续使用跨地区社交媒体组|账号 API 保持稳定，图片和视频 CDN 独立自动优选)$/ { next }
+  /^  - DOMAIN,(video\.twimg\.com|video-s\.twimg\.com),X视频$/ { next }
   /^  - DOMAIN-SUFFIX,(x\.com|twitter\.com|twimg\.com|twittercdn\.com|t\.co|pscp\.tv|periscope\.tv|tweetdeck\.com|instagram\.com|cdninstagram\.com|facebook\.com|facebook\.net|fbcdn\.net|fbsbx\.com|fb\.com|fb\.me|messenger\.com|meta\.com|threads\.net|oculus\.com),(X媒体|X视频|社交媒体|Instagram媒体)$/ { next }
   /^  - RULE-SET,Docker,/ {
     print_x_rules()
@@ -351,6 +369,9 @@ has_exact_line "$FALLBACK_GROUP_LINE" || fail "稳定优选分组校验失败。
 has_exact_line '  - DOMAIN,ghcr.io,容器镜像' || fail "ghcr.io 规则校验失败。"
 has_exact_line '  - DOMAIN,pkg-containers.githubusercontent.com,容器镜像' || fail "镜像层规则校验失败。"
 has_exact_line '  - DOMAIN-SUFFIX,instagram.com,社交媒体' || fail "Instagram 账号规则校验失败。"
+has_exact_line '  - DOMAIN,video.twimg.com,X视频' || fail "X 视频规则校验失败。"
+has_exact_line '  - DOMAIN,video-s.twimg.com,X视频' || fail "X 视频 CDN 规则校验失败。"
+has_exact_line '  - DOMAIN-SUFFIX,twimg.com,X媒体' || fail "X 静态媒体规则校验失败。"
 has_exact_line '  - DOMAIN-SUFFIX,cdninstagram.com,Instagram媒体' || fail "Instagram CDN 规则校验失败。"
 has_exact_line '  - DOMAIN-SUFFIX,fbcdn.net,Instagram媒体' || fail "Meta CDN 规则校验失败。"
 has_exact_line '  - DOMAIN-SUFFIX,fbsbx.com,Instagram媒体' || fail "Meta 媒体规则校验失败。"
@@ -381,5 +402,5 @@ else
 fi
 
 trap - ERR
-say "更新完成：已启用跨订阅单层自动优选，并让稳定优选直接按地区组故障接管；同时隔离 Instagram 账号与媒体线路、修复韩国节点误匹配和社交应用 DNS 污染，并让 GHCR 与 X/Instagram 媒体连接自动切换低速或停滞线路。"
+say "更新完成：已启用跨订阅单层自动优选，并让稳定优选直接按地区组故障接管；同时隔离 X 图片/视频与 Instagram 账号/媒体线路、修复韩国节点误匹配和社交应用 DNS 污染，并让 GHCR 自动切换低速或停滞线路。"
 say "备份保留在：$BACKUP"
