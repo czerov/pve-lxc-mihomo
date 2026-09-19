@@ -68,10 +68,10 @@ function print_youtube_dns() {
   print "      - \"https://1.1.1.1/dns-query#谷歌服务\""
 }
 function print_youtube_group() {
-  print "  - {name: YouTube, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: \"https://www.youtube.com/generate_204\", interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png\"}"
+  print "  - {name: YouTube, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: \"https://www.youtube.com/generate_204\", interval: 300, tolerance: 50, lazy: true, timeout: 5000, max-failed-times: 2, hidden: false, icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/YouTube.png\"}"
 }
 function print_google_group() {
-  print "  - {name: 谷歌服务, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: \"https://www.google.com/generate_204\", interval: 60, tolerance: 50, lazy: false, timeout: 5000, max-failed-times: 1, hidden: false, icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png\"}"
+  print "  - {name: 谷歌服务, type: url-test, proxies: [香港高速, 新加坡节点, 日本节点, 台湾节点, 美国节点], url: \"https://www.google.com/generate_204\", interval: 300, tolerance: 50, lazy: true, timeout: 5000, max-failed-times: 2, hidden: false, icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Google_Search.png\"}"
 }
 function print_hk_fast_group() {
   print "  - {name: 香港高速, !!merge <<: *UrlTest, filter: *FilterHK, exclude-filter: \"(?i)(直连|direct|电信推荐|专线|住宅|hy2|hysteria)\", icon: \"https://raw.githubusercontent.com/Koolson/Qure/refs/heads/master/IconSet/Color/Hong_Kong.png\"}"
