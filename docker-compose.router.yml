@@ -1,0 +1,46 @@
+services:
+  mihomo-router:
+    build:
+      context: .
+      args:
+        MIHOMO_VERSION: ${MIHOMO_VERSION:-v1.19.28}
+    image: pve-lxc-mihomo:${IMAGE_TAG:-local}
+    container_name: mihomo-router
+    restart: unless-stopped
+    stop_grace_period: 30s
+    mem_limit: ${CONTAINER_MEMORY:-1g}
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      GOMEMLIMIT: ${GOMEMLIMIT:-600MiB}
+      MIHOMO_TUN_ENABLED: "true"
+      NEXUSBOX_USERNAME: ${NEXUSBOX_USERNAME:-admin}
+      NEXUSBOX_PASSWORD: ${NEXUSBOX_PASSWORD:-admin}
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - NET_BIND_SERVICE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv6.conf.all.forwarding: "1"
+      net.ipv6.conf.all.accept_ra: "2"
+      net.ipv6.conf.default.accept_ra: "2"
+    dns:
+      - 223.5.5.5
+      - 119.29.29.29
+    volumes:
+      - ./docker-data/config:/opt/config
+    networks:
+      lan:
+        ipv4_address: ${LAN_IP:?set LAN_IP in .env}
+
+networks:
+  lan:
+    driver: macvlan
+    driver_opts:
+      parent: ${LAN_INTERFACE:?set LAN_INTERFACE in .env}
+    ipam:
+      config:
+        - subnet: ${LAN_SUBNET:?set LAN_SUBNET in .env}
+          gateway: ${LAN_GATEWAY:?set LAN_GATEWAY in .env}

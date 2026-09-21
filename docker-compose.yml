@@ -1,0 +1,29 @@
+services:
+  mihomo-router:
+    build:
+      context: .
+      args:
+        MIHOMO_VERSION: ${MIHOMO_VERSION:-v1.19.28}
+    image: pve-lxc-mihomo:${IMAGE_TAG:-local}
+    container_name: mihomo-router
+    restart: unless-stopped
+    stop_grace_period: 30s
+    mem_limit: ${CONTAINER_MEMORY:-1g}
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      GOMEMLIMIT: ${GOMEMLIMIT:-600MiB}
+      MIHOMO_TUN_ENABLED: "false"
+      NEXUSBOX_USERNAME: ${NEXUSBOX_USERNAME:-admin}
+      NEXUSBOX_PASSWORD: ${NEXUSBOX_PASSWORD:-admin}
+    dns:
+      - 223.5.5.5
+      - 119.29.29.29
+    ports:
+      - "${NEXUSBOX_PORT:-18080}:18080"
+      - "${HTTP_PROXY_PORT:-7890}:7890"
+      - "${SOCKS_PROXY_PORT:-7891}:7891"
+      - "${CONTROLLER_PORT:-9090}:9090"
+      - "${DNS_PORT:-1053}:53/tcp"
+      - "${DNS_PORT:-1053}:53/udp"
+    volumes:
+      - ./docker-data/config:/opt/config
